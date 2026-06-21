@@ -1,1 +1,328 @@
+/* ===== RESET E BASE ===== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+}
+body {
+    background-color: #0E1117;
+    color: #FAFAFA;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+}
 
+/* ===== SIDEBAR ===== */
+.sidebar {
+    width: 220px;
+    background-color: #0E1117;
+    border-right: 1px solid #1E2026;
+    padding: 25px 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex-shrink: 0;
+    height: 100vh;
+    position: sticky;
+    top: 0;
+}
+.sidebar .logo {
+    font-size: 22px;
+    font-weight: 700;
+    color: #7C3AED;
+    margin-bottom: 20px;
+    text-align: center;
+}
+.sidebar .logo span {
+    display: block;
+    font-size: 11px;
+    color: #6B7280;
+    font-weight: 400;
+}
+.sidebar .user-info {
+    background: #1E2026;
+    padding: 12px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    text-align: center;
+    font-size: 14px;
+}
+.sidebar .user-info strong {
+    color: white;
+}
+.nav-item {
+    padding: 10px 16px;
+    border-radius: 10px;
+    cursor: pointer;
+    color: #A1A1AA;
+    transition: all 0.2s;
+    font-weight: 500;
+    font-size: 14px;
+    border: none;
+    background: transparent;
+    text-align: left;
+    width: 100%;
+}
+.nav-item:hover {
+    background: #1E2026;
+    color: white;
+}
+.nav-item.active {
+    background: #7C3AED;
+    color: white;
+    box-shadow: 0 0 20px rgba(124, 58, 237, 0.2);
+}
+.sidebar .footer {
+    margin-top: auto;
+    font-size: 11px;
+    color: #3F3F46;
+    text-align: center;
+}
+
+/* ===== CONTEÚDO ===== */
+.main-content {
+    flex: 1;
+    padding: 30px 40px;
+    overflow-y: auto;
+    height: 100vh;
+}
+.tab-content {
+    display: none;
+    animation: fadeIn 0.3s ease;
+}
+.tab-content.active {
+    display: block;
+}
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+h1 { font-size: 26px; margin-bottom: 6px; }
+.subtitle { color: #A1A1AA; margin-bottom: 25px; }
+
+/* ===== CARDS ===== */
+.card {
+    background: #1E2026;
+    border: 1px solid #2D2F3A;
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+}
+.flex-row {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+button {
+    background: #7C3AED;
+    color: white;
+    border: none;
+    padding: 10px 22px;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 14px;
+}
+button:hover {
+    background: #6D28D9;
+    transform: scale(1.02);
+}
+button.danger {
+    background: #DC2626;
+}
+button.danger:hover {
+    background: #B91C1C;
+}
+button.secondary {
+    background: #2D2F3A;
+}
+button.secondary:hover {
+    background: #3F3F46;
+}
+
+input, select, textarea {
+    background: #0E1117;
+    border: 1px solid #2D2F3A;
+    border-radius: 10px;
+    padding: 10px 14px;
+    color: white;
+    width: 100%;
+    font-size: 14px;
+}
+input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: #7C3AED;
+}
+textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+/* ===== TIMER ===== */
+.timer-display {
+    font-size: 48px;
+    font-weight: 700;
+    text-align: center;
+    color: #7C3AED;
+    font-variant-numeric: tabular-nums;
+}
+.progress-bar {
+    width: 100%;
+    height: 6px;
+    background: #2D2F3A;
+    border-radius: 10px;
+    margin: 16px 0;
+    overflow: hidden;
+}
+.progress-bar .fill {
+    height: 100%;
+    background: #7C3AED;
+    border-radius: 10px;
+    transition: width 0.3s;
+}
+
+/* ===== MÉTRICAS ===== */
+.metric-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+    margin: 15px 0;
+}
+.metric {
+    background: #0E1117;
+    padding: 15px;
+    border-radius: 12px;
+    text-align: center;
+    border: 1px solid #2D2F3A;
+}
+.metric .value {
+    font-size: 22px;
+    font-weight: 700;
+}
+.metric .label {
+    font-size: 12px;
+    color: #A1A1AA;
+}
+
+/* ===== FLASHCARDS ===== */
+.flashcard-item {
+    background: #0E1117;
+    padding: 14px;
+    border-radius: 12px;
+    margin-bottom: 10px;
+    border-left: 4px solid #7C3AED;
+    cursor: pointer;
+}
+.flashcard-item .pergunta {
+    font-weight: 600;
+}
+.flashcard-item .resposta {
+    display: none;
+    color: #A1A1AA;
+    margin-top: 8px;
+}
+.flashcard-item.aberto .resposta {
+    display: block;
+}
+
+/* ===== QUESTÕES ===== */
+.questao-item {
+    background: #0E1117;
+    padding: 16px;
+    border-radius: 12px;
+    margin-bottom: 16px;
+    border: 1px solid #2D2F3A;
+}
+.questao-item label {
+    display: block;
+    padding: 4px 8px;
+    margin: 4px 0;
+    border-radius: 6px;
+    cursor: pointer;
+}
+.questao-item label:hover {
+    background: #1E2026;
+}
+.questao-item input[type="radio"] {
+    accent-color: #7C3AED;
+    margin-right: 10px;
+}
+
+/* ===== RANKING ===== */
+.ranking-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid #1E2026;
+}
+.ranking-item .pos {
+    font-weight: 700;
+    width: 35px;
+    color: #7C3AED;
+}
+
+/* ===== CHAT ===== */
+#chat-mensagens {
+    max-height: 400px;
+    overflow-y: auto;
+    margin-bottom: 16px;
+    background: #0E1117;
+    border-radius: 12px;
+    padding: 16px;
+}
+.mensagem {
+    margin-bottom: 12px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    max-width: 80%;
+}
+.mensagem.usuario {
+    background: #2D2F3A;
+    align-self: flex-end;
+    margin-left: auto;
+    text-align: right;
+}
+.mensagem.ia {
+    background: #1E2026;
+    border-left: 3px solid #7C3AED;
+}
+
+/* ===== RESPONSIVO ===== */
+@media (max-width: 768px) {
+    body {
+        flex-direction: column;
+        height: auto;
+        overflow: auto;
+    }
+    .sidebar {
+        width: 100%;
+        height: auto;
+        flex-direction: row;
+        flex-wrap: wrap;
+        padding: 12px;
+        border-right: none;
+        border-bottom: 1px solid #1E2026;
+        gap: 4px;
+    }
+    .sidebar .logo {
+        margin-bottom: 0;
+        flex: 1;
+        font-size: 18px;
+    }
+    .sidebar .user-info {
+        display: none;
+    }
+    .nav-item {
+        padding: 6px 12px;
+        font-size: 13px;
+        width: auto;
+    }
+    .main-content {
+        padding: 16px;
+        height: auto;
+    }
+}
