@@ -143,6 +143,11 @@ button.secondary {
 button.secondary:hover {
     background: #3F3F46;
 }
+button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none !important;
+}
 
 input, select, textarea {
     background: #0E1117;
@@ -302,6 +307,64 @@ textarea {
     border-left: 3px solid #7C3AED;
 }
 
+/* ===== CHAT FORMATADO (MARKDOWN) ===== */
+.mensagem.ia h4 {
+    color: #7C3AED;
+    margin: 12px 0 6px 0;
+}
+.mensagem.ia h5 {
+    color: #A1A1AA;
+    margin: 8px 0 4px 0;
+}
+.mensagem.ia strong {
+    color: #FAFAFA;
+}
+.mensagem.ia ul, .mensagem.ia ol {
+    padding-left: 20px;
+    margin: 6px 0;
+}
+.mensagem.ia table {
+    border-collapse: collapse;
+    margin: 8px 0;
+    width: 100%;
+    font-size: 13px;
+}
+.mensagem.ia th, .mensagem.ia td {
+    border: 1px solid #2D2F3A;
+    padding: 6px 10px;
+    text-align: left;
+}
+.mensagem.ia th {
+    background: #1E2026;
+    color: #FAFAFA;
+}
+.mensagem.ia td {
+    color: #A1A1AA;
+}
+.mensagem.ia code {
+    background: #1E2026;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: monospace;
+    color: #4ADE80;
+}
+.mensagem.ia pre {
+    background: #0E1117;
+    padding: 12px;
+    border-radius: 8px;
+    overflow-x: auto;
+    border: 1px solid #2D2F3A;
+}
+.mensagem.ia pre code {
+    background: transparent;
+    padding: 0;
+    color: #A1A1AA;
+}
+.mensagem.ia hr {
+    border-color: #2D2F3A;
+    margin: 12px 0;
+}
+
 /* ===== RESUMO FORMATADO ===== */
 .resumo-formatado h4 {
     color: #7C3AED;
@@ -367,5 +430,11 @@ textarea {
     .main-content {
         padding: 16px;
         height: auto;
+    }
+    .mensagem {
+        max-width: 95%;
+    }
+    .mensagem.ia table {
+        font-size: 11px;
     }
 }
