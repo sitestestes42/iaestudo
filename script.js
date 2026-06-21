@@ -51,7 +51,7 @@ document.querySelectorAll('.nav-item').forEach(btn => {
 // ================================================================
 //  FUNÇÃO CHAMAR GROQ (MODELO ATUALIZADO)
 // ================================================================
-async function chamarGroq(prompt, modelo = 'llama3-70b-8192') {
+async function chamarGroq(prompt, modelo = 'openai/gpt-oss-120b') {
     const url = 'https://api.groq.com/openai/v1/chat/completions';
     const payload = {
         model: modelo,
