@@ -237,19 +237,30 @@ textarea {
     margin-bottom: 16px;
     border: 1px solid #2D2F3A;
 }
-.questao-item label {
-    display: block;
-    padding: 4px 8px;
+.questao-item .opcao {
+    padding: 6px 12px;
     margin: 4px 0;
-    border-radius: 6px;
+    border-radius: 8px;
     cursor: pointer;
+    background: #0E1117;
+    border: 1px solid #2D2F3A;
+    transition: 0.2s;
 }
-.questao-item label:hover {
+.questao-item .opcao:hover {
+    background: #1E2026;
+    border-color: #7C3AED;
+}
+.questao-item .opcao.selecionada {
+    border-color: #7C3AED;
     background: #1E2026;
 }
-.questao-item input[type="radio"] {
-    accent-color: #7C3AED;
-    margin-right: 10px;
+.questao-item .opcao.correta {
+    border-color: #4ADE80;
+    background: #1E3A2A;
+}
+.questao-item .opcao.errada {
+    border-color: #F87171;
+    background: #3A1E1E;
 }
 
 /* ===== RANKING ===== */
@@ -289,6 +300,38 @@ textarea {
 .mensagem.ia {
     background: #1E2026;
     border-left: 3px solid #7C3AED;
+}
+
+/* ===== RESUMO FORMATADO ===== */
+.resumo-formatado h4 {
+    color: #7C3AED;
+    margin-top: 12px;
+    margin-bottom: 6px;
+}
+.resumo-formatado strong {
+    color: #FAFAFA;
+}
+.resumo-formatado ul, .resumo-formatado ol {
+    padding-left: 20px;
+    color: #A1A1AA;
+}
+.resumo-formatado table {
+    border-collapse: collapse;
+    margin: 10px 0;
+    width: 100%;
+    font-size: 14px;
+}
+.resumo-formatado th, .resumo-formatado td {
+    border: 1px solid #2D2F3A;
+    padding: 8px 12px;
+    text-align: left;
+}
+.resumo-formatado th {
+    background: #1E2026;
+    color: #FAFAFA;
+}
+.resumo-formatado td {
+    color: #A1A1AA;
 }
 
 /* ===== RESPONSIVO ===== */
