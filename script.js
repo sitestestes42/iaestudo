@@ -1,8 +1,6 @@
 // ================================================================
 //  CONFIGURAÇÃO GROQ (CHAVE INSERIDA)
 // ================================================================
-// ⚠️ ATENÇÃO: Esta chave está exposta. Restrinja-a por domínio no console da Groq!
-// 🔑 Se você compartilhou essa chave publicamente, revogue-a e crie uma nova.
 const GROQ_API_KEY = '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';
 
 // ================================================================
@@ -29,7 +27,6 @@ const state = {
     estudando: false,
     segundos: 0,
     timerInterval: null,
-    materiaAtual: 'Matemática'
 };
 
 // ================================================================
@@ -128,7 +125,6 @@ document.getElementById('btn-iniciar').addEventListener('click', () => {
     if (state.estudando) return;
     state.estudando = true;
     state.segundos = 0;
-    state.materiaAtual = document.getElementById('materia-select').value;
     clearInterval(state.timerInterval);
     state.timerInterval = setInterval(() => {
         state.segundos++;
@@ -147,13 +143,12 @@ document.getElementById('btn-finalizar').addEventListener('click', () => {
 });
 
 // ================================================================
-//  PÓS-ESTUDO
+//  PÓS-ESTUDO (BASEADO NA DESCRIÇÃO, NÃO NA MATÉRIA)
 // ================================================================
 document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
     const descricao = document.getElementById('descricao-estudo').value;
     if (!descricao) { alert('Descreva o que você estudou!'); return; }
     const duracao = Math.floor(state.segundos / 60);
-    const materia = state.materiaAtual;
 
     const btn = document.getElementById('btn-gerar-pos');
     btn.textContent = '⏳ Gerando...';
@@ -161,11 +156,11 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
 
     try {
         const prompt = `
-        O aluno estudou "${materia}" por ${duracao} minutos. Descrição: "${descricao}".
-        Gere um JSON com:
-        1. "resumo": resumo curto (máx 3 linhas).
-        2. "flashcards": lista de 5 strings no formato "Pergunta|Resposta".
-        3. "quiz": lista de 3 objetos com "pergunta", "opcoes" (array de 4), "resposta_correta" e "explicacao".
+        O aluno estudou por ${duracao} minutos. Descrição do conteúdo estudado: "${descricao}".
+        Com base APENAS nessa descrição, gere um JSON com:
+        1. "resumo": resumo curto (máx 3 linhas) do que foi descrito.
+        2. "flashcards": lista de 5 strings no formato "Pergunta|Resposta" que resumem os principais pontos da descrição.
+        3. "quiz": lista de 3 objetos com "pergunta", "opcoes" (array de 4), "resposta_correta" e "explicacao" – todos baseados estritamente no conteúdo descrito pelo aluno.
         Retorne APENAS o JSON.
         `;
         const texto = await chamarGroq(prompt);
@@ -184,9 +179,9 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
             };
         }
 
-        // Salvar sessão
+        // Salvar sessão (sem matéria específica)
         const sessoes = LS.get('sessoes', []);
-        sessoes.push({ materia, duracao, descricao, data: hoje() });
+        sessoes.push({ materia: 'Geral', duracao, descricao, data: hoje() });
         LS.set('sessoes', sessoes);
 
         // Salvar flashcards
@@ -197,7 +192,7 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
             flashcards.push({
                 pergunta: partes[0] || c,
                 resposta: partes[1] || 'Clique para ver',
-                materia,
+                materia: 'Geral',
                 proxima_revisao: hoje(),
                 criado: hoje()
             });
@@ -235,7 +230,7 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
         }
         div.innerHTML = html;
 
-        alert(`✅ Estudo finalizado! ${duracao} min em ${materia}.`);
+        alert(`✅ Estudo finalizado! ${duracao} min. Flashcards e quiz gerados a partir da sua descrição.`);
 
     } catch (e) {
         alert('Erro ao chamar a Groq. Verifique sua chave no console (F12).');
@@ -459,4 +454,4 @@ carregarFlashcards();
 carregarRelatorios();
 
 console.log('🚀 My Study IA rodando com GROQ (modelo llama3-70b-8192)!');
-console.log('⚠️ Chave API inserida. Restrinja por domínio no console da Groq.');
+console.log('✅ O quiz agora é baseado na sua descrição, não na matéria.');
