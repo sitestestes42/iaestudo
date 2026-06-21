@@ -81,7 +81,7 @@ async function chamarGroq(prompt, modelo = 'openai/gpt-oss-120b') {
 }
 
 // ================================================================
-//  FORMATADOR DE MARKDOWN PARA HTML (para chat e resumo)
+//  FORMATADOR DE MARKDOWN PARA HTML
 // ================================================================
 function formatarMarkdown(texto) {
     if (!texto) return '';
@@ -99,7 +99,6 @@ function formatarMarkdown(texto) {
         return match;
     });
     
-    // Tabelas
     const tableRegex = /^\|.*\|$/gm;
     let tableMatch;
     let tables = [];
@@ -137,7 +136,7 @@ function formatarMarkdown(texto) {
 }
 
 // ================================================================
-//  CHAT COM IA (COM INDICADOR DE "PENSANDO" E SALVANDO HISTÓRICO)
+//  CHAT COM IA (COM HISTÓRICO)
 // ================================================================
 const chatMensagens = document.getElementById('chat-mensagens');
 const chatInput = document.getElementById('chat-input');
@@ -187,7 +186,6 @@ function limparHistoricoChat() {
     adicionarMensagem('🗑️ Histórico limpo!', 'ia', true);
 }
 
-// Botão limpar chat
 const btnLimparChat = document.createElement('button');
 btnLimparChat.textContent = '🗑️ Limpar Histórico';
 btnLimparChat.className = 'secondary';
@@ -254,7 +252,7 @@ document.getElementById('btn-finalizar').addEventListener('click', () => {
 });
 
 // ================================================================
-//  PÓS-ESTUDO
+//  PÓS-ESTUDO (COM QUIZ CORRIGIDO PARA MOBILE)
 // ================================================================
 document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
     const descricao = document.getElementById('descricao-estudo').value;
@@ -288,9 +286,9 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
                 flashcards: ['Erro ao gerar flashcards|Tente novamente'],
                 quiz: [{ 
                     pergunta: 'Não foi possível gerar quiz.', 
-                    opcoes: ['A) Tente', 'B) Novamente', 'C) Mais tarde', 'D) OK', 'E) Sair'], 
+                    opcoes: ['A) Tente novamente', 'B) Verifique a descrição', 'C) Estude mais', 'D) Use o chat', 'E) OK'], 
                     resposta_correta: 'A', 
-                    explicacao: 'Verifique o console' 
+                    explicacao: 'Verifique o console para mais detalhes.' 
                 }]
             };
         }
@@ -342,17 +340,30 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
                 if (q.opcoes && q.opcoes.length === 5) {
                     q.opcoes.forEach((op, oi) => {
                         const letra = String.fromCharCode(65 + oi);
+                        // Verifica se a opção começa com a letra, senão adiciona
+                        let opcaoFormatada = op;
+                        if (!op.match(/^[A-E]\)/)) {
+                            opcaoFormatada = `${letra}) ${op}`;
+                        }
                         html += `
-                        <div class="opcao" data-idx="${idx}" data-letra="${letra}" data-correta="${q.resposta_correta}" data-explicacao="${q.explicacao || ''}">
-                            ${op}
+                        <div class="opcao" data-idx="${idx}" data-letra="${letra}" data-correta="${q.resposta_correta}" data-explicacao="${q.explicacao || ''}" style="padding:12px 16px; margin:6px 0; border-radius:10px; cursor:pointer; background:#0E1117; border:1px solid #2D2F3A; transition:0.2s; touch-action: manipulation;">
+                            ${opcaoFormatada}
                         </div>`;
                     });
                 } else {
-                    html += `▪ A) Opção 1<br>▪ B) Opção 2<br>▪ C) Opção 3<br>▪ D) Opção 4<br>▪ E) Opção 5`;
+                    // Fallback com opções padrão
+                    const opcoesPadrao = ['A) Tente novamente', 'B) Verifique a descrição', 'C) Estude mais', 'D) Use o chat', 'E) OK'];
+                    opcoesPadrao.forEach((op, oi) => {
+                        const letra = String.fromCharCode(65 + oi);
+                        html += `
+                        <div class="opcao" data-idx="${idx}" data-letra="${letra}" data-correta="A" data-explicacao="Opção padrão" style="padding:12px 16px; margin:6px 0; border-radius:10px; cursor:pointer; background:#0E1117; border:1px solid #2D2F3A; transition:0.2s; touch-action: manipulation;">
+                            ${op}
+                        </div>`;
+                    });
                 }
                 html += `
                     </div>
-                    <div id="feedback-${idx}" style="margin-top:8px; display:none;"></div>
+                    <div id="feedback-${idx}" style="margin-top:10px; display:none; padding:10px; border-radius:8px;"></div>
                 </div>`;
             });
         } else {
@@ -360,8 +371,10 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
         }
         div.innerHTML = html;
 
+        // Adicionar eventos de clique e toque
         document.querySelectorAll('.opcao').forEach(el => {
-            el.addEventListener('click', function() {
+            function handleInteraction(e) {
+                e.preventDefault();
                 const idx = this.dataset.idx;
                 const letraEscolhida = this.dataset.letra;
                 const correta = this.dataset.correta;
@@ -377,6 +390,7 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
                 if (letraEscolhida === correta) {
                     this.classList.add('correta');
                     feedback.innerHTML = `<span style="color:#4ADE80;">✅ Correta! ${explicacao}</span>`;
+                    feedback.style.background = '#1E3A2A';
                 } else {
                     this.classList.add('errada');
                     parent.querySelectorAll('.opcao').forEach(opt => {
@@ -385,8 +399,14 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
                         }
                     });
                     feedback.innerHTML = `<span style="color:#F87171;">❌ Errada. A correta é ${correta}. ${explicacao}</span>`;
+                    feedback.style.background = '#3A1E1E';
                 }
-            });
+                feedback.style.borderRadius = '8px';
+                feedback.style.padding = '10px';
+            }
+            // Suporte para mouse e toque
+            el.addEventListener('click', handleInteraction);
+            el.addEventListener('touchstart', handleInteraction, { passive: false });
         });
 
         alert(`✅ Estudo finalizado! ${duracao} min.`);
@@ -507,9 +527,7 @@ document.getElementById('btn-corrigir-redacao').addEventListener('click', async 
 let questoesAtuais = [];
 let respostasVest = {};
 
-// Função EXTRA FORTE para extrair JSON – tenta 5 estratégias diferentes
 function extrairJSONSuper(texto) {
-    // Estratégia 1: Remove blocos de código e tenta parse direto
     let limpo = texto.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
     try {
         const parsed = JSON.parse(limpo);
@@ -519,7 +537,6 @@ function extrairJSONSuper(texto) {
         return parsed;
     } catch (e) {}
 
-    // Estratégia 2: Procura por um array com regex (mais abrangente)
     const arrayMatch = limpo.match(/\[\s*\{[\s\S]*\}\s*\]/);
     if (arrayMatch) {
         try {
@@ -528,7 +545,6 @@ function extrairJSONSuper(texto) {
         } catch (e) {}
     }
 
-    // Estratégia 3: Procura por um objeto que contém um array de questões
     const objMatch = limpo.match(/\{\s*"(?:questoes|questions|itens|items)"\s*:\s*\[[\s\S]*\]\s*\}/);
     if (objMatch) {
         try {
@@ -540,7 +556,6 @@ function extrairJSONSuper(texto) {
         } catch (e) {}
     }
 
-    // Estratégia 4: Tenta extrair múltiplos objetos individuais e montar um array
     const objectMatches = limpo.match(/\{[^{}]*"enunciado"[^{}]*\}/g);
     if (objectMatches && objectMatches.length > 0) {
         try {
@@ -549,7 +564,6 @@ function extrairJSONSuper(texto) {
         } catch (e) {}
     }
 
-    // Estratégia 5: Fallback – tenta encontrar qualquer coisa que pareça um array
     const fallbackMatch = limpo.match(/\[[\s\S]*\]/);
     if (fallbackMatch) {
         try {
@@ -561,7 +575,6 @@ function extrairJSONSuper(texto) {
     return null;
 }
 
-// Função para exibir resultado do vestibulinho formatado
 function exibirResultadoVestibulinho(nota, acertos, total, questoes, respostas) {
     const container = document.getElementById('vestibulinho-container');
     
@@ -597,7 +610,7 @@ function exibirResultadoVestibulinho(nota, acertos, total, questoes, respostas) 
 
 document.getElementById('btn-gerar-vest').addEventListener('click', async () => {
     const btn = document.getElementById('btn-gerar-vest');
-    btn.textContent = '⏳ Gerando questões...';
+    btn.textContent = '⏳ Gerando 45 questões...';
     btn.disabled = true;
 
     try {
@@ -611,10 +624,8 @@ document.getElementById('btn-gerar-vest').addEventListener('click', async () => 
         const texto = await chamarGroq(prompt);
         console.log('🔍 RESPOSTA BRUTA (Vestibulinho):', texto);
         
-        // Usa a função super robusta
         let dados = extrairJSONSuper(texto);
         
-        // Se ainda não funcionou, tenta uma última vez com um parser mais agressivo
         if (!dados || !Array.isArray(dados) || dados.length === 0) {
             console.warn('⚠️ Tentando extração manual com regex...');
             const match = texto.match(/\[\s*\{[\s\S]*\}\s*\]/);
@@ -633,7 +644,6 @@ document.getElementById('btn-gerar-vest').addEventListener('click', async () => 
             throw new Error('A IA não retornou um array válido de questões.');
         }
 
-        // Filtra apenas os que têm os campos mínimos
         questoesAtuais = dados.filter(q => 
             q.enunciado && 
             q.opcoes && 
@@ -646,7 +656,6 @@ document.getElementById('btn-gerar-vest').addEventListener('click', async () => 
             throw new Error(`Apenas ${questoesAtuais.length} questões válidas foram geradas. Tente novamente.`);
         }
 
-        // Limita a 45
         if (questoesAtuais.length > 45) {
             questoesAtuais = questoesAtuais.slice(0, 45);
         }
@@ -679,14 +688,14 @@ function renderizarVestibulinho() {
         q.opcoes.forEach(op => {
             const letra = op.charAt(0);
             const checked = respostasVest[idx] === letra ? 'checked' : '';
-            html += `<label style="display:block; padding:4px 8px; margin:4px 0; border-radius:6px; cursor:pointer;">
-                <input type="radio" name="vest_${idx}" value="${letra}" ${checked} onchange="marcarVest(${idx}, '${letra}')" style="accent-color:#7C3AED; margin-right:10px;">
+            html += `<label style="display:block; padding:12px 16px; margin:6px 0; border-radius:10px; cursor:pointer; background:#0E1117; border:1px solid #2D2F3A; transition:0.2s; touch-action: manipulation;">
+                <input type="radio" name="vest_${idx}" value="${letra}" ${checked} onchange="marcarVest(${idx}, '${letra}')" style="accent-color:#7C3AED; margin-right:12px; transform:scale(1.2);">
                 ${op}
             </label>`;
         });
         html += `</div></div>`;
     });
-    html += `<button id="btn-finalizar-vest">📊 Finalizar e Ver Resultado</button>`;
+    html += `<button id="btn-finalizar-vest" style="margin-top:16px; width:100%; padding:16px;">📊 Finalizar e Ver Resultado</button>`;
     container.innerHTML = html;
 
     document.getElementById('btn-finalizar-vest').addEventListener('click', finalizarVestibulinho);
@@ -753,4 +762,4 @@ carregarRelatorios();
 restaurarHistoricoChat();
 
 console.log('🚀 My Study IA rodando com GROQ (modelo openai/gpt-oss-120b)');
-console.log('✅ Chat com histórico | Vestibulinho com extração SUPER robusta');
+console.log('✅ Corrigido para mobile: quiz com opções clicáveis e fallback melhorado');
