@@ -48,7 +48,7 @@ document.querySelectorAll('.nav-item').forEach(btn => {
 // ================================================================
 //  FUNÇÃO CHAMAR GROQ (MODELO LLAMA3-70B)
 // ================================================================
-async function chamarGroq(prompt, modelo = 'llama3-70b-8192') {
+async function chamarGroq(prompt, modelo = 'openai/gpt-oss-120b') {
     const url = 'https://api.groq.com/openai/v1/chat/completions';
     const payload = {
         model: modelo,
@@ -78,6 +78,27 @@ async function chamarGroq(prompt, modelo = 'llama3-70b-8192') {
     const texto = data.choices?.[0]?.message?.content;
     if (!texto) throw new Error('Resposta vazia da IA');
     return texto;
+}
+
+// ================================================================
+//  FORMATADOR DE RESUMO (markdown básico para HTML)
+// ================================================================
+function formatarResumo(texto) {
+    if (!texto) return '';
+    // Converte **negrito** para <strong>
+    let html = texto.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    // Converte ## Título para <h4>
+    html = html.replace(/^## (.*)/gm, '<h4>$1</h4>');
+    // Converte ### Título para <h5>
+    html = html.replace(/^### (.*)/gm, '<h5>$1</h5>');
+    // Converte * listas para <ul><li>
+    html = html.replace(/^\* (.*)/gm, '<li>$1</li>');
+    html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+    // Converte linhas com --- para <hr>
+    html = html.replace(/^---$/gm, '<hr>');
+    // Converte quebras de linha para <br>
+    html = html.replace(/\n/g, '<br>');
+    return html;
 }
 
 // ================================================================
@@ -143,7 +164,7 @@ document.getElementById('btn-finalizar').addEventListener('click', () => {
 });
 
 // ================================================================
-//  PÓS-ESTUDO (COM FLASHCARDS DE PALAVRAS-CHAVE E QUIZ 5 ALT)
+//  PÓS-ESTUDO (RESUMO FORMATADO + FLASHCARDS PALAVRAS-CHAVE + QUIZ INTERATIVO)
 // ================================================================
 document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
     const descricao = document.getElementById('descricao-estudo').value;
@@ -158,11 +179,11 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
         const prompt = `
         O aluno estudou por ${duracao} minutos. Descrição do conteúdo estudado: "${descricao}".
         Com base APENAS nessa descrição, gere um JSON com:
-        1. "resumo": resumo curto (máx 3 linhas) do que foi descrito.
-        2. "flashcards": lista de 5 strings no formato "Palavra-chave|Explicação breve" – cada string deve conter uma palavra‑chave que ajude a lembrar do conteúdo, seguida de uma explicação concisa (ex: "Equação|Igualdade com incógnita").
+        1. "resumo": um resumo claro e didático do conteúdo (pode usar títulos, negrito, listas, mas mantenha texto puro, sem formatação especial, apenas markdown simples com ##, ** e *).
+        2. "flashcards": lista de 5 strings no formato "Palavra-chave|Explicação breve" – palavras‑chave que ajudem a lembrar do conteúdo.
         3. "quiz": lista de 3 objetos. Cada objeto deve ter:
            - "pergunta": uma pergunta sobre o conteúdo descrito.
-           - "opcoes": um array com 5 alternativas (A, B, C, D, E).
+           - "opcoes": um array com 5 alternativas (A, B, C, D, E) – cada string deve começar com a letra e um parêntese (ex: "A) ...").
            - "resposta_correta": a letra da alternativa correta (ex: "A").
            - "explicacao": por que essa é a resposta correta.
         Retorne APENAS o JSON.
@@ -199,8 +220,8 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
         cards.forEach(c => {
             const partes = c.split('|');
             flashcards.push({
-                pergunta: partes[0] || c,        // palavra-chave
-                resposta: partes[1] || 'Clique para ver', // explicação
+                pergunta: partes[0] || c,
+                resposta: partes[1] || 'Clique para ver',
                 materia: 'Geral',
                 proxima_revisao: hoje(),
                 criado: hoje()
@@ -208,10 +229,14 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
         });
         LS.set('flashcards', flashcards);
 
-        // Exibir resultado
+        // --- EXIBIR RESULTADO ---
         const div = document.getElementById('resultado-pos');
-        let html = `<h4>📌 Resumo</h4><p>${resultado.resumo || 'Estudo registrado!'}</p>`;
-        
+        let html = '';
+
+        // 1. Resumo formatado
+        html += `<div class="resumo-formatado"><h4>📌 Resumo</h4>${formatarResumo(resultado.resumo || 'Estudo registrado!')}</div>`;
+
+        // 2. Flashcards (palavras-chave)
         html += `<h4>🔑 Palavras‑chave (Flashcards)</h4>`;
         if (cards.length > 0) {
             cards.forEach((c, i) => {
@@ -227,26 +252,72 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
             html += `<p style="color:#A1A1AA;">Nenhum flashcard gerado.</p>`;
         }
 
-        html += `<h4>📝 Quiz (5 alternativas)</h4>`;
+        // 3. Quiz interativo (5 alternativas)
+        html += `<h4>📝 Quiz (clique em uma alternativa)</h4>`;
         const quiz = resultado.quiz || [];
         if (quiz.length > 0) {
             quiz.forEach((q, idx) => {
-                html += `<div class="questao-item"><strong>${idx+1}. ${q.pergunta}</strong><br>`;
+                html += `
+                <div class="questao-item" id="quiz-${idx}">
+                    <strong>${idx+1}. ${q.pergunta}</strong>
+                    <div style="margin-top:8px;">`;
                 if (q.opcoes && q.opcoes.length === 5) {
-                    q.opcoes.forEach(op => {
-                        html += `▪ ${op}<br>`;
+                    q.opcoes.forEach((op, oi) => {
+                        const letra = String.fromCharCode(65 + oi); // A, B, C, D, E
+                        html += `
+                        <div class="opcao" data-idx="${idx}" data-letra="${letra}" data-correta="${q.resposta_correta}" data-explicacao="${q.explicacao || ''}">
+                            ${op}
+                        </div>`;
                     });
                 } else {
-                    // fallback se a IA não retornar 5 opções
                     html += `▪ A) Opção 1<br>▪ B) Opção 2<br>▪ C) Opção 3<br>▪ D) Opção 4<br>▪ E) Opção 5`;
                 }
-                html += `<br><span style="color:#7C3AED;">✅ Resposta correta: ${q.resposta_correta}</span>`;
-                html += `<br><span style="color:#A1A1AA;">💡 ${q.explicacao || ''}</span></div>`;
+                html += `
+                    </div>
+                    <div id="feedback-${idx}" style="margin-top:8px; display:none;"></div>
+                </div>`;
             });
         } else {
             html += `<p style="color:#A1A1AA;">Nenhum quiz gerado.</p>`;
         }
+
         div.innerHTML = html;
+
+        // Adicionar eventos de clique nas opções do quiz
+        document.querySelectorAll('.opcao').forEach(el => {
+            el.addEventListener('click', function() {
+                const idx = this.dataset.idx;
+                const letraEscolhida = this.dataset.letra;
+                const correta = this.dataset.correta;
+                const explicacao = this.dataset.explicacao;
+                const feedback = document.getElementById(`feedback-${idx}`);
+                const parent = this.closest('.questao-item');
+                
+                // Remove destaque de todas as opções desta pergunta
+                parent.querySelectorAll('.opcao').forEach(opt => {
+                    opt.classList.remove('selecionada', 'correta', 'errada');
+                });
+                
+                // Destaca a opção escolhida
+                this.classList.add('selecionada');
+                
+                // Exibe feedback
+                feedback.style.display = 'block';
+                if (letraEscolhida === correta) {
+                    this.classList.add('correta');
+                    feedback.innerHTML = `<span style="color:#4ADE80;">✅ Correta! ${explicacao}</span>`;
+                } else {
+                    this.classList.add('errada');
+                    // Mostra a correta
+                    parent.querySelectorAll('.opcao').forEach(opt => {
+                        if (opt.dataset.letra === correta) {
+                            opt.classList.add('correta');
+                        }
+                    });
+                    feedback.innerHTML = `<span style="color:#F87171;">❌ Errada. A correta é ${correta}. ${explicacao}</span>`;
+                }
+            });
+        });
 
         alert(`✅ Estudo finalizado! ${duracao} min. Flashcards e quiz gerados a partir da sua descrição.`);
 
@@ -361,7 +432,7 @@ document.getElementById('btn-corrigir-redacao').addEventListener('click', async 
 });
 
 // ================================================================
-//  VESTIBULINHO
+//  VESTIBULINHO (COM VALIDAÇÃO ROBUSTA)
 // ================================================================
 let questoesAtuais = [];
 let respostasVest = {};
@@ -374,23 +445,57 @@ document.getElementById('btn-gerar-vest').addEventListener('click', async () => 
     try {
         const prompt = `
         Gere um simulado com 45 questões de múltipla escolha (5 alternativas A-E) para ensino médio.
-        Retorne APENAS um JSON com uma lista de 45 objetos. Cada objeto: 
-        {"id":1, "enunciado":"...", "opcoes":["A) ...", "B) ...", "C) ...", "D) ...", "E) ..."], "gabarito":"A", "explicacao":"..."}.
+        As questões devem cobrir diversas áreas: matemática, português, história, geografia, física, química, biologia, inglês e conhecimentos gerais.
+        Retorne APENAS um JSON com uma lista de 45 objetos. Cada objeto deve ter os campos:
+        "id" (número), "enunciado" (string), "opcoes" (array com 5 strings, cada uma começando com "A) ", "B) ", etc.), "gabarito" (string com a letra correta), "explicacao" (string com a justificativa).
+        Certifique-se de que o JSON seja 100% válido e que todas as 45 questões estejam completas.
         `;
         const texto = await chamarGroq(prompt);
         console.log('🔍 RESPOSTA BRUTA (Vestibulinho):', texto);
+        
+        let dados = [];
         try {
             const limpo = texto.replace(/```json|```/g, '').trim();
-            questoesAtuais = JSON.parse(limpo);
+            dados = JSON.parse(limpo);
         } catch (e) {
-            console.warn('⚠️ JSON do vestibulinho inválido. Usando fallback.');
-            questoesAtuais = [];
+            console.warn('⚠️ JSON do vestibulinho inválido. Tentando extrair array manualmente...');
+            // Fallback: tenta encontrar um array dentro do texto
+            const match = texto.match(/\[\s*\{.*\}\s*\]/s);
+            if (match) {
+                try {
+                    dados = JSON.parse(match[0]);
+                } catch (e2) {
+                    dados = [];
+                }
+            } else {
+                dados = [];
+            }
         }
+
+        // Validação: se não for array ou estiver vazio, gera erro amigável
+        if (!Array.isArray(dados) || dados.length === 0) {
+            throw new Error('A IA não retornou um array válido de questões.');
+        }
+
+        // Filtra apenas os que têm os campos mínimos
+        questoesAtuais = dados.filter(q => q.enunciado && q.opcoes && q.opcoes.length === 5 && q.gabarito);
+        
+        if (questoesAtuais.length < 10) {
+            throw new Error(`Apenas ${questoesAtuais.length} questões válidas foram geradas. Tente novamente.`);
+        }
+
+        // Limita a 45
+        questoesAtuais = questoesAtuais.slice(0, 45);
         respostasVest = {};
         renderizarVestibulinho();
+
     } catch (e) {
-        alert('Erro ao gerar simulado. Veja o console.');
+        alert(`❌ Erro: ${e.message || 'Não foi possível gerar o simulado. Tente novamente.'}`);
         console.error(e);
+        document.getElementById('vestibulinho-container').innerHTML = `
+            <p style="color:#F87171;">❌ Não foi possível gerar as questões. Verifique o console (F12) para mais detalhes.</p>
+            <button onclick="document.getElementById('btn-gerar-vest').click()" style="margin-top:12px;">🔄 Tentar Novamente</button>
+        `;
     }
     btn.textContent = '🔄 Gerar Simulado';
     btn.disabled = false;
@@ -398,19 +503,22 @@ document.getElementById('btn-gerar-vest').addEventListener('click', async () => 
 
 function renderizarVestibulinho() {
     const container = document.getElementById('vestibulinho-container');
-    if (!questoesAtuais.length) {
-        container.innerHTML = '<p>⚠️ Não foi possível gerar as questões. Clique em "Gerar" novamente ou veja o console (F12).</p>';
+    if (!questoesAtuais || questoesAtuais.length === 0) {
+        container.innerHTML = '<p style="color:#F87171;">⚠️ Nenhuma questão disponível. Clique em "Gerar" novamente.</p>';
         return;
     }
-    let html = `<p style="color:#A1A1AA;">${Object.keys(respostasVest).length} / 45 respondidas</p>`;
-    questoesAtuais.slice(0, 45).forEach((q, idx) => {
-        html += `<div class="questao-item">
+    let html = `<p style="color:#A1A1AA;">${Object.keys(respostasVest).length} / ${questoesAtuais.length} respondidas</p>`;
+    questoesAtuais.forEach((q, idx) => {
+        html += `<div class="questao-item" id="vest-${idx}">
             <strong>Q${idx+1}. ${q.enunciado}</strong>
-            <div>`;
+            <div style="margin-top:8px;">`;
         q.opcoes.forEach(op => {
             const letra = op.charAt(0);
             const checked = respostasVest[idx] === letra ? 'checked' : '';
-            html += `<label><input type="radio" name="vest_${idx}" value="${letra}" ${checked} onchange="marcarVest(${idx}, '${letra}')"> ${op}</label>`;
+            html += `<label style="display:block; padding:4px 8px; margin:4px 0; border-radius:6px; cursor:pointer;">
+                <input type="radio" name="vest_${idx}" value="${letra}" ${checked} onchange="marcarVest(${idx}, '${letra}')" style="accent-color:#7C3AED; margin-right:10px;">
+                ${op}
+            </label>`;
         });
         html += `</div></div>`;
     });
@@ -422,18 +530,25 @@ function renderizarVestibulinho() {
 
 function marcarVest(idx, letra) {
     respostasVest[idx] = letra;
-    renderizarVestibulinho();
+    // Atualiza contador
+    const container = document.getElementById('vestibulinho-container');
+    const p = container.querySelector('p');
+    if (p) p.textContent = `${Object.keys(respostasVest).length} / ${questoesAtuais.length} respondidas`;
 }
 
 function finalizarVestibulinho() {
+    if (Object.keys(respostasVest).length < questoesAtuais.length) {
+        const confirmar = confirm(`Você respondeu ${Object.keys(respostasVest).length} de ${questoesAtuais.length} questões. Deseja finalizar mesmo assim?`);
+        if (!confirmar) return;
+    }
     let acertos = 0;
-    questoesAtuais.slice(0, 45).forEach((q, idx) => {
+    questoesAtuais.forEach((q, idx) => {
         if (respostasVest[idx] === q.gabarito) acertos++;
     });
-    const nota = ((acertos / 45) * 100).toFixed(1);
-    alert(`🎯 NOTA: ${nota}% (Acertou ${acertos} de 45)`);
+    const nota = ((acertos / questoesAtuais.length) * 100).toFixed(1);
+    alert(`🎯 NOTA: ${nota}% (Acertou ${acertos} de ${questoesAtuais.length})`);
     const historico = LS.get('vestibulinho_historico', []);
-    historico.push({ nota, data: hoje(), acertos, total: 45 });
+    historico.push({ nota, data: hoje(), acertos, total: questoesAtuais.length });
     LS.set('vestibulinho_historico', historico);
     carregarRelatorios();
 }
@@ -472,4 +587,4 @@ carregarFlashcards();
 carregarRelatorios();
 
 console.log('🚀 My Study IA rodando com GROQ (modelo llama3-70b-8192)');
-console.log('🔑 Flashcards = palavras‑chave, Quiz = 5 alternativas (A‑E)');
+console.log('✅ Resumo formatado | Flashcards = palavras-chave | Quiz interativo 5 alt | Vestibulinho validado');
