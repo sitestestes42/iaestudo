@@ -81,33 +81,101 @@ async function chamarGroq(prompt, modelo = 'openai/gpt-oss-120b') {
 }
 
 // ================================================================
-//  FORMATADOR DE RESUMO (markdown básico para HTML)
+//  FORMATADOR DE MARKDOWN PARA HTML (para chat e resumo)
 // ================================================================
-function formatarResumo(texto) {
+function formatarMarkdown(texto) {
     if (!texto) return '';
-    let html = texto.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    html = html.replace(/^## (.*)/gm, '<h4>$1</h4>');
+    let html = texto;
+    
+    // Títulos ## e ###
     html = html.replace(/^### (.*)/gm, '<h5>$1</h5>');
+    html = html.replace(/^## (.*)/gm, '<h4>$1</h4>');
+    
+    // Negrito **
+    html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    
+    // Itálico *
+    html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    
+    // Listas não ordenadas (* item)
     html = html.replace(/^\* (.*)/gm, '<li>$1</li>');
-    html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+    html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
+    
+    // Listas ordenadas (1. item)
+    html = html.replace(/^\d+\. (.*)/gm, '<li>$1</li>');
+    html = html.replace(/(<li>.*<\/li>\n?)+/g, (match) => {
+        // Só converte se não for dentro de um <ul> já existente
+        if (!match.includes('<ul>')) {
+            return `<ol>${match}</ol>`;
+        }
+        return match;
+    });
+    
+    // Tabelas (simples: linhas com |)
+    const tableRegex = /^\|.*\|$/gm;
+    let tableMatch;
+    let tables = [];
+    while ((tableMatch = tableRegex.exec(html)) !== null) {
+        tables.push(tableMatch[0]);
+    }
+    tables.forEach((t, i) => {
+        const rows = t.split('\n').filter(r => r.trim().startsWith('|'));
+        if (rows.length < 2) return;
+        let tableHtml = '<table>';
+        rows.forEach((row, ri) => {
+            const cells = row.split('|').filter(c => c.trim() !== '');
+            // Pula linha de separação (|---|)
+            if (cells.every(c => /^-+$/.test(c.trim()))) return;
+            tableHtml += '<tr>';
+            cells.forEach(cell => {
+                const tag = ri === 0 ? 'th' : 'td';
+                tableHtml += `<${tag}>${cell.trim()}</${tag}>`;
+            });
+            tableHtml += '</tr>';
+        });
+        tableHtml += '</table>';
+        html = html.replace(t, tableHtml);
+    });
+    
+    // Linhas com --- para <hr>
     html = html.replace(/^---$/gm, '<hr>');
+    
+    // Código inline (backticks)
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+    
+    // Blocos de código (```)
+    html = html.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+    
+    // Quebras de linha duplas para parágrafos
+    html = html.replace(/\n\n/g, '</p><p>');
     html = html.replace(/\n/g, '<br>');
+    
+    // Envolve em <p> se não tiver tags de bloco
+    if (!html.startsWith('<') && !html.startsWith('</')) {
+        html = `<p>${html}</p>`;
+    }
+    
     return html;
 }
 
 // ================================================================
-//  CHAT COM IA
+//  CHAT COM IA (COM INDICADOR DE "PENSANDO")
 // ================================================================
 const chatMensagens = document.getElementById('chat-mensagens');
 const chatInput = document.getElementById('chat-input');
 const btnChat = document.getElementById('btn-chat-enviar');
 
-function adicionarMensagem(texto, tipo) {
+function adicionarMensagem(texto, tipo, formatado = false) {
     const div = document.createElement('div');
     div.className = `mensagem ${tipo}`;
-    div.textContent = texto;
+    if (formatado) {
+        div.innerHTML = formatarMarkdown(texto);
+    } else {
+        div.textContent = texto;
+    }
     chatMensagens.appendChild(div);
     chatMensagens.scrollTop = chatMensagens.scrollHeight;
+    return div;
 }
 
 async function enviarPergunta(pergunta) {
@@ -115,14 +183,29 @@ async function enviarPergunta(pergunta) {
     adicionarMensagem(pergunta, 'usuario');
     chatInput.value = '';
 
+    // --- Adiciona indicador de "pensando" ---
+    const loadingDiv = document.createElement('div');
+    loadingDiv.className = 'mensagem ia';
+    loadingDiv.innerHTML = '⏳ <em>Pensando...</em>';
+    chatMensagens.appendChild(loadingDiv);
+    chatMensagens.scrollTop = chatMensagens.scrollHeight;
+    btnChat.disabled = true;
+
     try {
-        const prompt = `Responda de forma clara e didática: ${pergunta}`;
+        const prompt = `Responda de forma clara e didática. Use markdown para organizar a resposta (títulos ##, negrito **, listas com *, tabelas com |). ${pergunta}`;
         const resp = await chamarGroq(prompt);
-        adicionarMensagem(resp, 'ia');
+        
+        // Remove o indicador de "pensando"
+        loadingDiv.remove();
+        
+        // Adiciona a resposta formatada
+        adicionarMensagem(resp, 'ia', true);
     } catch (e) {
-        adicionarMensagem('Erro ao obter resposta. Verifique sua chave e console (F12).', 'ia');
+        loadingDiv.innerHTML = '❌ <em>Erro ao obter resposta. Verifique sua chave e console (F12).</em>';
+        loadingDiv.style.borderLeftColor = '#F87171';
         console.error(e);
     }
+    btnChat.disabled = false;
 }
 
 btnChat.addEventListener('click', () => enviarPergunta(chatInput.value));
@@ -228,7 +311,7 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
         let html = '';
 
         // 1. Resumo formatado
-        html += `<div class="resumo-formatado"><h4>📌 Resumo</h4>${formatarResumo(resultado.resumo || 'Estudo registrado!')}</div>`;
+        html += `<div class="resumo-formatado"><h4>📌 Resumo</h4>${formatarMarkdown(resultado.resumo || 'Estudo registrado!')}</div>`;
 
         // 2. Flashcards (palavras-chave)
         html += `<h4>🔑 Palavras‑chave (Flashcards)</h4>`;
@@ -287,22 +370,18 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
                 const feedback = document.getElementById(`feedback-${idx}`);
                 const parent = this.closest('.questao-item');
                 
-                // Remove destaque de todas as opções desta pergunta
                 parent.querySelectorAll('.opcao').forEach(opt => {
                     opt.classList.remove('selecionada', 'correta', 'errada');
                 });
                 
-                // Destaca a opção escolhida
                 this.classList.add('selecionada');
                 
-                // Exibe feedback
                 feedback.style.display = 'block';
                 if (letraEscolhida === correta) {
                     this.classList.add('correta');
                     feedback.innerHTML = `<span style="color:#4ADE80;">✅ Correta! ${explicacao}</span>`;
                 } else {
                     this.classList.add('errada');
-                    // Mostra a correta
                     parent.querySelectorAll('.opcao').forEach(opt => {
                         if (opt.dataset.letra === correta) {
                             opt.classList.add('correta');
@@ -453,7 +532,6 @@ document.getElementById('btn-gerar-vest').addEventListener('click', async () => 
             dados = JSON.parse(limpo);
         } catch (e) {
             console.warn('⚠️ JSON do vestibulinho inválido. Tentando extrair array manualmente...');
-            // Fallback: tenta encontrar um array dentro do texto
             const match = texto.match(/\[\s*\{.*\}\s*\]/s);
             if (match) {
                 try {
@@ -466,19 +544,16 @@ document.getElementById('btn-gerar-vest').addEventListener('click', async () => 
             }
         }
 
-        // Validação: se não for array ou estiver vazio, gera erro amigável
         if (!Array.isArray(dados) || dados.length === 0) {
             throw new Error('A IA não retornou um array válido de questões.');
         }
 
-        // Filtra apenas os que têm os campos mínimos
         questoesAtuais = dados.filter(q => q.enunciado && q.opcoes && q.opcoes.length === 5 && q.gabarito);
         
         if (questoesAtuais.length < 10) {
             throw new Error(`Apenas ${questoesAtuais.length} questões válidas foram geradas. Tente novamente.`);
         }
 
-        // Limita a 45
         questoesAtuais = questoesAtuais.slice(0, 45);
         respostasVest = {};
         renderizarVestibulinho();
@@ -580,4 +655,4 @@ carregarFlashcards();
 carregarRelatorios();
 
 console.log('🚀 My Study IA rodando com GROQ (modelo openai/gpt-oss-120b)');
-console.log('✅ Resumo formatado | Flashcards = palavras-chave | Quiz interativo 5 alt | Vestibulinho validado');
+console.log('✅ Chat com formatação markdown e indicador de "pensando"');
