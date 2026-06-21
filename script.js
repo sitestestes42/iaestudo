@@ -46,9 +46,9 @@ document.querySelectorAll('.nav-item').forEach(btn => {
 });
 
 // ================================================================
-//  FUNÇÃO CHAMAR GROQ (MODELO ATUALIZADO)
+//  FUNÇÃO CHAMAR GROQ (MODELO LLAMA3-70B)
 // ================================================================
-async function chamarGroq(prompt, modelo = 'openai/gpt-oss-120b') {
+async function chamarGroq(prompt, modelo = 'llama3-70b-8192') {
     const url = 'https://api.groq.com/openai/v1/chat/completions';
     const payload = {
         model: modelo,
@@ -143,7 +143,7 @@ document.getElementById('btn-finalizar').addEventListener('click', () => {
 });
 
 // ================================================================
-//  PÓS-ESTUDO (BASEADO NA DESCRIÇÃO, NÃO NA MATÉRIA)
+//  PÓS-ESTUDO (COM FLASHCARDS DE PALAVRAS-CHAVE E QUIZ 5 ALT)
 // ================================================================
 document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
     const descricao = document.getElementById('descricao-estudo').value;
@@ -159,8 +159,12 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
         O aluno estudou por ${duracao} minutos. Descrição do conteúdo estudado: "${descricao}".
         Com base APENAS nessa descrição, gere um JSON com:
         1. "resumo": resumo curto (máx 3 linhas) do que foi descrito.
-        2. "flashcards": lista de 5 strings no formato "Pergunta|Resposta" que resumem os principais pontos da descrição.
-        3. "quiz": lista de 3 objetos com "pergunta", "opcoes" (array de 4), "resposta_correta" e "explicacao" – todos baseados estritamente no conteúdo descrito pelo aluno.
+        2. "flashcards": lista de 5 strings no formato "Palavra-chave|Explicação breve" – cada string deve conter uma palavra‑chave que ajude a lembrar do conteúdo, seguida de uma explicação concisa (ex: "Equação|Igualdade com incógnita").
+        3. "quiz": lista de 3 objetos. Cada objeto deve ter:
+           - "pergunta": uma pergunta sobre o conteúdo descrito.
+           - "opcoes": um array com 5 alternativas (A, B, C, D, E).
+           - "resposta_correta": a letra da alternativa correta (ex: "A").
+           - "explicacao": por que essa é a resposta correta.
         Retorne APENAS o JSON.
         `;
         const texto = await chamarGroq(prompt);
@@ -175,23 +179,28 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
             resultado = {
                 resumo: texto.substring(0, 500),
                 flashcards: ['Erro ao gerar flashcards|Tente novamente'],
-                quiz: [{ pergunta: 'Não foi possível gerar quiz.', opcoes: ['A) Tente', 'B) Novamente'], resposta_correta: 'A', explicacao: 'Verifique o console' }]
+                quiz: [{ 
+                    pergunta: 'Não foi possível gerar quiz.', 
+                    opcoes: ['A) Tente', 'B) Novamente', 'C) Mais tarde', 'D) OK', 'E) Sair'], 
+                    resposta_correta: 'A', 
+                    explicacao: 'Verifique o console' 
+                }]
             };
         }
 
-        // Salvar sessão (sem matéria específica)
+        // Salvar sessão
         const sessoes = LS.get('sessoes', []);
         sessoes.push({ materia: 'Geral', duracao, descricao, data: hoje() });
         LS.set('sessoes', sessoes);
 
-        // Salvar flashcards
+        // Salvar flashcards (palavras-chave)
         const flashcards = LS.get('flashcards', []);
         const cards = resultado.flashcards || [];
         cards.forEach(c => {
             const partes = c.split('|');
             flashcards.push({
-                pergunta: partes[0] || c,
-                resposta: partes[1] || 'Clique para ver',
+                pergunta: partes[0] || c,        // palavra-chave
+                resposta: partes[1] || 'Clique para ver', // explicação
                 materia: 'Geral',
                 proxima_revisao: hoje(),
                 criado: hoje()
@@ -202,28 +211,37 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
         // Exibir resultado
         const div = document.getElementById('resultado-pos');
         let html = `<h4>📌 Resumo</h4><p>${resultado.resumo || 'Estudo registrado!'}</p>`;
-        html += `<h4>🃏 Flashcards</h4>`;
+        
+        html += `<h4>🔑 Palavras‑chave (Flashcards)</h4>`;
         if (cards.length > 0) {
             cards.forEach((c, i) => {
                 const partes = c.split('|');
-                const p = partes[0] || c;
-                const r = partes[1] || 'Clique para ver';
+                const palavra = partes[0] || c;
+                const explicacao = partes[1] || 'Clique para ver';
                 html += `<div class="flashcard-item" onclick="this.classList.toggle('aberto')">
-                    <div class="pergunta">${i+1}. ${p}</div>
-                    <div class="resposta">${r}</div>
+                    <div class="pergunta">${i+1}. ${palavra}</div>
+                    <div class="resposta">${explicacao}</div>
                 </div>`;
             });
         } else {
             html += `<p style="color:#A1A1AA;">Nenhum flashcard gerado.</p>`;
         }
 
-        html += `<h4>📝 Quiz</h4>`;
+        html += `<h4>📝 Quiz (5 alternativas)</h4>`;
         const quiz = resultado.quiz || [];
         if (quiz.length > 0) {
-            quiz.forEach(q => {
-                html += `<div class="questao-item"><strong>${q.pergunta}</strong><br>`;
-                (q.opcoes || []).forEach(o => { html += `▪ ${o} `; });
-                html += `<br><span style="color:#7C3AED;">✅ ${q.resposta_correta}</span> <span style="color:#A1A1AA;">${q.explicacao || ''}</span></div>`;
+            quiz.forEach((q, idx) => {
+                html += `<div class="questao-item"><strong>${idx+1}. ${q.pergunta}</strong><br>`;
+                if (q.opcoes && q.opcoes.length === 5) {
+                    q.opcoes.forEach(op => {
+                        html += `▪ ${op}<br>`;
+                    });
+                } else {
+                    // fallback se a IA não retornar 5 opções
+                    html += `▪ A) Opção 1<br>▪ B) Opção 2<br>▪ C) Opção 3<br>▪ D) Opção 4<br>▪ E) Opção 5`;
+                }
+                html += `<br><span style="color:#7C3AED;">✅ Resposta correta: ${q.resposta_correta}</span>`;
+                html += `<br><span style="color:#A1A1AA;">💡 ${q.explicacao || ''}</span></div>`;
             });
         } else {
             html += `<p style="color:#A1A1AA;">Nenhum quiz gerado.</p>`;
@@ -277,7 +295,7 @@ document.getElementById('btn-add-ranking').addEventListener('click', () => {
 });
 
 // ================================================================
-//  FLASHCARDS
+//  FLASHCARDS (REVISÃO ESPAÇADA)
 // ================================================================
 function carregarFlashcards() {
     const todos = LS.get('flashcards', []);
@@ -291,7 +309,7 @@ function carregarFlashcards() {
     let html = '';
     pendentes.forEach((f, idx) => {
         html += `<div class="flashcard-item" onclick="this.classList.toggle('aberto')">
-            <div class="pergunta">📌 ${f.pergunta}</div>
+            <div class="pergunta">🔑 ${f.pergunta}</div>
             <div class="resposta">${f.resposta}</div>
             <button style="margin-top:10px; padding:4px 12px; font-size:12px; background:#2D2F3A;" onclick="event.stopPropagation(); revisarFlashcard(${idx})">✅ Já revisei</button>
         </div>`;
@@ -453,5 +471,5 @@ carregarRanking();
 carregarFlashcards();
 carregarRelatorios();
 
-console.log('🚀 My Study IA rodando com GROQ (modelo llama3-70b-8192)!');
-console.log('✅ O quiz agora é baseado na sua descrição, não na matéria.');
+console.log('🚀 My Study IA rodando com GROQ (modelo llama3-70b-8192)');
+console.log('🔑 Flashcards = palavras‑chave, Quiz = 5 alternativas (A‑E)');
