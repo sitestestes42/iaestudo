@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📚 My Study IA (GitHub Pages)</title>
+    <style>
+        /* ===== RESET E BASE (DARK MODE) ===== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+        body {
+            background-color: #0E1117;
+            color: #FAFAFA;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* ===== SIDEBAR ===== */
+        .sidebar {
+            width: 220px;
+            background-color: #0E1117;
+            border-right: 1px solid #1E2026;
+            padding: 25px 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            flex-shrink: 0;
+            height: 100vh;
+            position: sticky;
+            top: 0;
+        }
+        .sidebar .logo {
+            font-size: 22px;
+            font-weight: 700;
+            color: #7C3AED;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .sidebar .logo span {
+            display: block;
+            font-size: 11px;
+            color: #6B7280;
+            font-weight: 400;
+        }
+        .sidebar .user-info {
+            background: #1E2026;
+            padding: 12px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 14px;
+        }
+        .sidebar .user-info strong {
+            color: white;
+        }
+        .nav-item {
+            padding: 10px 16px;
+            border-radius: 10px;
+            cursor: pointer;
+            color: #A1A1AA;
+            transition: all 0.2s;
+            font-weight: 500;
+            font-size: 14px;
+            border: none;
+            background: transparent;
+            text-align: left;
+            width: 100%;
+        }
+        .nav-item:hover {
+            background: #1E2026;
+            color: white;
+        }
+        .nav-item.active {
+            background: #7C3AED;
+            color: white;
+            box-shadow: 0 0 20px rgba(124, 58, 237, 0.2);
+        }
+        .sidebar .footer {
+            margin-top: auto;
+            font-size: 11px;
+            color: #3F3F46;
+            text-align: center;
+        }
+
+        /* ===== CONTEÚDO ===== */
+        .main-content {
+            flex: 1;
+            padding: 30px 40px;
+            overflow-y: auto;
+            height: 100vh;
+        }
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        h1 {
+            font-size: 26px;
+            margin-bottom: 6px;
+        }
+        .subtitle {
+            color: #A1A1AA;
+            margin-bottom: 25px;
+        }
+
+        /* ===== CARDS E BOTÕES ===== */
+        .card {
+            background: #1E2026;
+            border: 1px solid #2D2F3A;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        .flex-row {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        button {
+            background: #7C3AED;
+            color: white;
+            border: none;
+            padding: 10px 22px;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #6D28D9;
+            transform: scale(1.02);
+        }
+        button.danger {
+            background: #DC2626;
+        }
+        button.danger:hover {
+            background: #B91C1C;
+        }
+        button.secondary {
+            background: #2D2F3A;
+        }
+        button.secondary:hover {
+            background: #3F3F46;
+        }
+
+        input,
+        select,
+        textarea {
+            background: #0E1117;
+            border: 1px solid #2D2F3A;
+            border-radius: 10px;
+            padding: 10px 14px;
+            color: white;
+            width: 100%;
+            font-size: 14px;
+        }
+        input:focus,
+        select:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #7C3AED;
+        }
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .timer-display {
+            font-size: 48px;
+            font-weight: 700;
+            text-align: center;
+            color: #7C3AED;
+            font-variant-numeric: tabular-nums;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #2D2F3A;
+            border-radius: 10px;
+            margin: 16px 0;
+            overflow: hidden;
+        }
+        .progress-bar .fill {
+            height: 100%;
+            background: #7C3AED;
+            border-radius: 10px;
+            transition: width 0.3s;
+        }
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .metric {
+            background: #0E1117;
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid #2D2F3A;
+        }
+        .metric .value {
+            font-size: 22px;
+            font-weight: 700;
+        }
+        .metric .label {
+            font-size: 12px;
+            color: #A1A1AA;
+        }
+
+        .flashcard-item {
+            background: #0E1117;
+            padding: 14px;
+            border-radius: 12px;
+            margin-bottom: 10px;
+            border-left: 4px solid #7C3AED;
+            cursor: pointer;
+        }
+        .flashcard-item .pergunta {
+            font-weight: 600;
+        }
+        .flashcard-item .resposta {
+            display: none;
+            color: #A1A1AA;
+            margin-top: 8px;
+        }
+        .flashcard-item.aberto .resposta {
+            display: block;
+        }
+
+        .questao-item {
+            background: #0E1117;
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+            border: 1px solid #2D2F3A;
+        }
+        .questao-item label {
+            display: block;
+            padding: 4px 8px;
+            margin: 4px 0;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .questao-item label:hover {
+            background: #1E2026;
+        }
+        .questao-item input[type="radio"] {
+            accent-color: #7C3AED;
+            margin-right: 10px;
+        }
+
+        .ranking-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 14px;
+            border-bottom: 1px solid #1E2026;
+        }
+        .ranking-item .pos {
+            font-weight: 700;
+            width: 35px;
+            color: #7C3AED;
+        }
+
+        /* ===== RESPONSIVO ===== */
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+                height: auto;
+                overflow: auto;
+            }
+            .sidebar {
+                width: 100%;
+                height: auto;
+                flex-direction: row;
+                flex-wrap: wrap;
+                padding: 12px;
+                border-right: none;
+                border-bottom: 1px solid #1E2026;
+                gap: 4px;
+            }
+            .sidebar .logo {
+                margin-bottom: 0;
+                flex: 1;
+                font-size: 18px;
+            }
+            .sidebar .user-info {
+                display: none;
+            }
+            .nav-item {
+                padding: 6px 12px;
+                font-size: 13px;
+                width: auto;
+            }
+            .main-content {
+                padding: 16px;
+                height: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ===== SIDEBAR ===== -->
+    <div class="sidebar">
+        <div class="logo">📚 My Study <span>GitHub Pages</span></div>
+        <div class="user-info">👤 <strong>Você</strong> <span style="display:block;font-size:12px;color:#A1A1AA;" id="racha-display">🔥 0 dias</span></div>
+        <button class="nav-item active" data-tab="estudo">⏱️ Estudo</button>
+        <button class="nav-item" data-tab="grupo">🏆 Grupo</button>
+        <button class="nav-item" data-tab="flashcards">🃏 Flashcards</button>
+        <button class="nav-item" data-tab="redacao">✍️ Redação</button>
+        <button class="nav-item" data-tab="vestibulinho">📊 Vestibulinho</button>
+        <button class="nav-item" data-tab="relatorios">📈 Relatórios</button>
+        <div class="footer">🚀 Simples • LocalStorage</div>
+    </div>
+
+    <!-- ===== MAIN ===== -->
+    <div class="main-content">
+
+        <!-- TAB 1: ESTUDO -->
+        <div id="tab-estudo" class="tab-content active">
+            <h1>⏱️ Sessão de Estudo</h1>
+            <p class="subtitle">Foque, estude e no final a IA gera flashcards.</p>
+            <div class="card">
+                <div class="flex-row">
+                    <div style="flex:1;">
+                        <label>📚 Matéria</label>
+                        <select id="materia-select">
+                            <option>Matemática</option><option>Português</option><option>História</option>
+                            <option>Física</option><option>Química</option><option>Biologia</option>
+                            <option>Inglês</option><option>Redação</option><option>Programação</option>
+                        </select>
+                    </div>
+                    <div style="flex:1; display:flex; gap:10px;">
+                        <button id="btn-iniciar" style="flex:1;">▶️ Iniciar</button>
+                        <button id="btn-finalizar" style="flex:1;" class="danger">⏹️ Finalizar</button>
+                    </div>
+                </div>
+                <div class="timer-display" id="timer">00:00</div>
+                <div class="progress-bar"><div class="fill" id="timer-progress" style="width:0%;"></div></div>
+            </div>
+
+            <div id="pos-estudo-area" style="display:none;" class="card">
+                <h3>🧠 O que você estudou?</h3>
+                <textarea id="descricao-estudo" placeholder="Descreva o conteúdo estudado..." style="margin-bottom:12px;"></textarea>
+                <button id="btn-gerar-pos">📝 Gerar Flashcards e Quiz</button>
+                <div id="resultado-pos" style="margin-top:20px;"></div>
+            </div>
+        </div>
+
+        <!-- TAB 2: GRUPO -->
+        <div id="tab-grupo" class="tab-content">
+            <h1>🏆 Grupo de Estudos</h1>
+            <p class="subtitle">Ranking local (salvo no seu navegador).</p>
+            <div class="card">
+                <div class="flex-row">
+                    <input type="text" id="ranking-nome" placeholder="Seu nome" style="flex:1;" value="Você">
+                    <input type="number" id="ranking-minutos" placeholder="Minutos" style="flex:1;" value="30">
+                    <button id="btn-add-ranking">➕ Adicionar</button>
+                </div>
+                <div id="ranking-lista" style="margin-top:20px;"></div>
+            </div>
+        </div>
+
+        <!-- TAB 3: FLASHCARDS -->
+        <div id="tab-flashcards" class="tab-content">
+            <h1>🃏 Revisão Espaçada</h1>
+            <p class="subtitle">Flashcards que precisam de revisão hoje.</p>
+            <div id="flashcards-lista" class="card"></div>
+        </div>
+
+        <!-- TAB 4: REDAÇÃO -->
+        <div id="tab-redacao" class="tab-content">
+            <h1>✍️ Corretor de Redação</h1>
+            <p class="subtitle">Cole sua redação e receba correção estilo ENEM.</p>
+            <div class="card">
+                <textarea id="texto-redacao" style="min-height:200px;" placeholder="Digite ou cole sua redação aqui..."></textarea>
+                <button id="btn-corrigir-redacao" style="margin-top:12px;">📝 Corrigir Redação</button>
+                <div id="resultado-redacao" style="margin-top:20px; white-space:pre-wrap;"></div>
+            </div>
+        </div>
+
+        <!-- TAB 5: VESTIBULINHO -->
+        <div id="tab-vestibulinho" class="tab-content">
+            <h1>📊 Vestibulinho Semanal</h1>
+            <p class="subtitle">45 questões geradas por IA.</p>
+            <button id="btn-gerar-vest" style="margin-bottom:20px;">🔄 Gerar Simulado</button>
+            <div id="vestibulinho-container"></div>
+        </div>
+
+        <!-- TAB 6: RELATÓRIOS -->
+        <div id="tab-relatorios" class="tab-content">
+            <h1>📈 Relatórios</h1>
+            <p class="subtitle">Seus dados salvos localmente.</p>
+            <div class="card">
+                <div class="metric-grid">
+                    <div class="metric"><div class="value" id="rel-total">0</div><div class="label">Minutos totais</div></div>
+                    <div class="metric"><div class="value" id="rel-sessoes">0</div><div class="label">Sessões</div></div>
+                    <div class="metric"><div class="value" id="rel-flashcards">0</div><div class="label">Flashcards</div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // =============================================================
+        //  CONFIGURAÇÃO
+        // =============================================================
+        // 🔑 COLOQUE SUA CHAVE AQUI (PEGUE EM https://makersuite.google.com/app/apikey)
+        const GEMINI_API_KEY = 'SUA_CHAVE_AQUI';
+
+        // =============================================================
+        //  UTILITÁRIOS
+        // =============================================================
+        const LS = {
+            get(k, def = null) { try { return JSON.parse(localStorage.getItem(k)) || def; } catch (e) { return def; } },
+            set(k, v) { localStorage.setItem(k, JSON.stringify(v)); }
+        };
+
+        function hoje() { return new Date().toISOString().split('T')[0]; }
+
+        function formatarTempo(seg) {
+            const m = String(Math.floor(seg / 60)).padStart(2, '0');
+            const s = String(seg % 60).padStart(2, '0');
+            return `${m}:${s}`;
+        }
+
+        // =============================================================
+        //  ESTADO GLOBAL
+        // =============================================================
+        const state = {
+            estudando: false,
+            segundos: 0,
+            timerInterval: null,
+            materiaAtual: 'Matemática'
+        };
+
+        // =============================================================
+        //  NAVEGAÇÃO (TABS)
+        // =============================================================
+        document.querySelectorAll('.nav-item').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                const tab = this.dataset.tab;
+                document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+                document.getElementById(`tab-${tab}`).classList.add('active');
+                if (tab === 'flashcards') carregarFlashcards();
+                if (tab === 'grupo') carregarRanking();
+                if (tab === 'relatorios') carregarRelatorios();
+            });
+        });
+
+        // =============================================================
+        //  CRONÔMETRO
+        // =============================================================
+        const timerDisplay = document.getElementById('timer');
+        const progressFill = document.getElementById('timer-progress');
+
+        document.getElementById('btn-iniciar').addEventListener('click', () => {
+            if (state.estudando) return;
+            state.estudando = true;
+            state.segundos = 0;
+            state.materiaAtual = document.getElementById('materia-select').value;
+            clearInterval(state.timerInterval);
+            state.timerInterval = setInterval(() => {
+                state.segundos++;
+                timerDisplay.textContent = formatarTempo(state.segundos);
+                const prog = Math.min(state.segundos / 3600, 1);
+                progressFill.style.width = `${prog * 100}%`;
+            }, 1000);
+            document.getElementById('pos-estudo-area').style.display = 'none';
+        });
+
+        document.getElementById('btn-finalizar').addEventListener('click', () => {
+            if (!state.estudando) return;
+            clearInterval(state.timerInterval);
+            state.estudando = false;
+            document.getElementById('pos-estudo-area').style.display = 'block';
+        });
+
+        // =============================================================
+        //  PÓS-ESTUDO (CHAMA GEMINI DIRETAMENTE)
+        // =============================================================
+        document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
+            const descricao = document.getElementById('descricao-estudo').value;
+            if (!descricao) { alert('Descreva o que você estudou!'); return; }
+            const duracao = Math.floor(state.segundos / 60);
+            const materia = state.materiaAtual;
+
+            const btn = document.getElementById('btn-gerar-pos');
+            btn.textContent = '⏳ Gerando...';
+            btn.disabled = true;
+
+            try {
+                const prompt = `
+                O aluno estudou "${materia}" por ${duracao} minutos. Descrição: "${descricao}".
+                Gere um JSON com:
+                1. "resumo": resumo curto (máx 3 linhas).
+                2. "flashcards": lista de 5 strings no formato "Pergunta|Resposta".
+                3. "quiz": lista de 3 objetos com "pergunta", "opcoes" (array de 4), "resposta_correta" e "explicacao".
+                Retorne APENAS o JSON.
+                `;
+
+                const resp = await fetch(
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: prompt }] }]
+                        })
+                    }
+                );
+                const data = await resp.json();
+                const texto = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+                let resultado;
+                try {
+                    resultado = JSON.parse(texto.replace(/```json|```/g, '').trim());
+                } catch (e) {
+                    resultado = { resumo: 'Erro ao processar', flashcards: [], quiz: [] };
+                }
+
+                // Salvar sessão no localStorage
+                const sessoes = LS.get('sessoes', []);
+                sessoes.push({ materia, duracao, descricao, data: hoje() });
+                LS.set('sessoes', sessoes);
+
+                // Salvar flashcards
+                const flashcards = LS.get('flashcards', []);
+                const cards = resultado.flashcards || [];
+                cards.forEach(c => {
+                    const partes = c.split('|');
+                    flashcards.push({
+                        pergunta: partes[0] || c,
+                        resposta: partes[1] || '',
+                        materia,
+                        proxima_revisao: hoje(),
+                        criado: hoje()
+                    });
+                });
+                LS.set('flashcards', flashcards);
+
+                // Exibir resultado
+                const div = document.getElementById('resultado-pos');
+                let html = `<h4>📌 Resumo</h4><p>${resultado.resumo || 'Estudo registrado!'}</p>`;
+                html += `<h4>🃏 Flashcards</h4>`;
+                cards.forEach((c, i) => {
+                    const partes = c.split('|');
+                    const p = partes[0] || c;
+                    const r = partes[1] || 'Clique para ver';
+                    html += `<div class="flashcard-item" onclick="this.classList.toggle('aberto')">
+                        <div class="pergunta">${i+1}. ${p}</div>
+                        <div class="resposta">${r}</div>
+                    </div>`;
+                });
+                html += `<h4>📝 Quiz</h4>`;
+                (resultado.quiz || []).forEach(q => {
+                    html += `<div class="questao-item"><strong>${q.pergunta}</strong><br>`;
+                    (q.opcoes || []).forEach(o => { html += `▪ ${o} `; });
+                    html += `<br><span style="color:#7C3AED;">✅ ${q.resposta_correta}</span> <span style="color:#A1A1AA;">${q.explicacao}</span></div>`;
+                });
+                div.innerHTML = html;
+
+                // Notificação (sem Telegram, apenas alert)
+                alert(`✅ Estudo finalizado! ${duracao} min em ${materia}. Flashcards salvos!`);
+
+            } catch (e) {
+                alert('Erro ao chamar a IA. Verifique sua chave ou conexão.');
+                console.error(e);
+            }
+            btn.textContent = '📝 Gerar Flashcards e Quiz';
+            btn.disabled = false;
+        });
+
+        // =============================================================
+        //  RANKING (LOCAL)
+        // =============================================================
+        function carregarRanking() {
+            const ranking = LS.get('ranking', []);
+            const div = document.getElementById('ranking-lista');
+            if (!ranking.length) {
+                div.innerHTML = '<p style="color:#A1A1AA;">Ninguém registrou hoje. Adicione seus minutos!</p>';
+                return;
+            }
+            const ordenado = [...ranking].sort((a, b) => b.minutos - a.minutos);
+            let html = '';
+            ordenado.forEach((item, i) => {
+                const medalha = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}º`;
+                html += `<div class="ranking-item"><span class="pos">${medalha}</span><span>${item.nome}</span><span>${item.minutos} min</span></div>`;
+            });
+            div.innerHTML = html;
+        }
+
+        document.getElementById('btn-add-ranking').addEventListener('click', () => {
+            const nome = document.getElementById('ranking-nome').value.trim() || 'Anônimo';
+            const minutos = parseInt(document.getElementById('ranking-minutos').value) || 0;
+            if (minutos <= 0) { alert('Insira minutos válidos'); return; }
+            const ranking = LS.get('ranking', []);
+            const hojeStr = hoje();
+            // Atualiza se já existir hoje
+            const existente = ranking.find(r => r.nome === nome && r.data === hojeStr);
+            if (existente) {
+                existente.minutos += minutos;
+            } else {
+                ranking.push({ nome, minutos, data: hojeStr });
+            }
+            LS.set('ranking', ranking);
+            carregarRanking();
+            alert(`✅ ${nome} adicionou ${minutos} min ao ranking!`);
+        });
+
+        // =============================================================
+        //  FLASHCARDS (REVISÃO)
+        // =============================================================
+        function carregarFlashcards() {
+            const todos = LS.get('flashcards', []);
+            const hojeStr = hoje();
+            const pendentes = todos.filter(f => f.proxima_revisao <= hojeStr);
+            const div = document.getElementById('flashcards-lista');
+            if (!pendentes.length) {
+                div.innerHTML = '<p style="color:#A1A1AA;">🎉 Nenhum flashcard para revisar hoje!</p>';
+                return;
+            }
+            let html = '';
+            pendentes.forEach((f, idx) => {
+                html += `<div class="flashcard-item" onclick="this.classList.toggle('aberto')">
+                    <div class="pergunta">📌 ${f.pergunta}</div>
+                    <div class="resposta">${f.resposta}</div>
+                    <button style="margin-top:10px; padding:4px 12px; font-size:12px; background:#2D2F3A;" onclick="event.stopPropagation(); revisarFlashcard(${idx})">✅ Já revisei</button>
+                </div>`;
+            });
+            div.innerHTML = html;
+        }
+
+        function revisarFlashcard(idx) {
+            const todos = LS.get('flashcards', []);
+            const hojeStr = hoje();
+            // Pega os pendentes
+            const pendentes = todos.filter(f => f.proxima_revisao <= hojeStr);
+            if (!pendentes[idx]) return;
+            const card = pendentes[idx];
+            // Encontra no array original e atualiza
+            const originalIndex = todos.findIndex(f => f.pergunta === card.pergunta && f.criado === card.criado);
+            if (originalIndex !== -1) {
+                // Próxima revisão em 3 dias
+                const d = new Date();
+                d.setDate(d.getDate() + 3);
+                todos[originalIndex].proxima_revisao = d.toISOString().split('T')[0];
+                LS.set('flashcards', todos);
+            }
+            carregarFlashcards();
+            alert('✅ Flashcard revisado! Próxima revisão em 3 dias.');
+        }
+
+        // =============================================================
+        //  REDAÇÃO
+        // =============================================================
+        document.getElementById('btn-corrigir-redacao').addEventListener('click', async () => {
+            const texto = document.getElementById('texto-redacao').value;
+            if (!texto) { alert('Escreva a redação primeiro!'); return; }
+            const btn = document.getElementById('btn-corrigir-redacao');
+            btn.textContent = '⏳ Corrigindo...';
+            btn.disabled = true;
+
+            try {
+                const prompt = `
+                Corrija a redação abaixo como se fosse o ENEM:
+                ${texto}
+                Dê: Nota (0-1000), análise de estrutura (introdução/desenvolvimento/conclusão), erros gramaticais, 3 sugestões de melhoria e um trecho reescrito.
+                `;
+                const resp = await fetch(
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                    }
+                );
+                const data = await resp.json();
+                const resultado = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Erro ao corrigir.';
+                document.getElementById('resultado-redacao').innerHTML = `<div class="card">${resultado.replace(/\n/g, '<br>')}</div>`;
+            } catch (e) {
+                alert('Erro na correção.');
+                console.error(e);
+            }
+            btn.textContent = '📝 Corrigir Redação';
+            btn.disabled = false;
+        });
+
+        // =============================================================
+        //  VESTIBULINHO (45 questões)
+        // =============================================================
+        let questoesAtuais = [];
+        let respostasVest = {};
+
+        document.getElementById('btn-gerar-vest').addEventListener('click', async () => {
+            const btn = document.getElementById('btn-gerar-vest');
+            btn.textContent = '⏳ Gerando 45 questões...';
+            btn.disabled = true;
+
+            try {
+                const prompt = `
+                Gere um simulado com 45 questões de múltipla escolha (5 alternativas A-E) para ensino médio.
+                Retorne APENAS um JSON com uma lista de 45 objetos. Cada objeto: 
+                {"id":1, "enunciado":"...", "opcoes":["A) ...", "B) ...", "C) ...", "D) ...", "E) ..."], "gabarito":"A", "explicacao":"..."}.
+                `;
+                const resp = await fetch(
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                    }
+                );
+                const data = await resp.json();
+                const texto = data.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+                try {
+                    questoesAtuais = JSON.parse(texto.replace(/```json|```/g, '').trim());
+                } catch (e) {
+                    questoesAtuais = [];
+                }
+                respostasVest = {};
+                renderizarVestibulinho();
+            } catch (e) {
+                alert('Erro ao gerar simulado.');
+                console.error(e);
+            }
+            btn.textContent = '🔄 Gerar Simulado';
+            btn.disabled = false;
+        });
+
+        function renderizarVestibulinho() {
+            const container = document.getElementById('vestibulinho-container');
+            if (!questoesAtuais.length) {
+                container.innerHTML = '<p>Clique em "Gerar Simulado" para começar.</p>';
+                return;
+            }
+            let html = `<p style="color:#A1A1AA;">${Object.keys(respostasVest).length} / 45 respondidas</p>`;
+            questoesAtuais.forEach((q, idx) => {
+                html += `<div class="questao-item">
+                    <strong>Q${idx+1}. ${q.enunciado}</strong>
+                    <div>`;
+                q.opcoes.forEach(op => {
+                    const letra = op.charAt(0);
+                    const checked = respostasVest[idx] === letra ? 'checked' : '';
+                    html += `<label><input type="radio" name="vest_${idx}" value="${letra}" ${checked} onchange="marcarVest(${idx}, '${letra}')"> ${op}</label>`;
+                });
+                html += `</div></div>`;
+            });
+            html += `<button id="btn-finalizar-vest">📊 Finalizar e Ver Resultado</button>`;
+            container.innerHTML = html;
+
+            document.getElementById('btn-finalizar-vest').addEventListener('click', finalizarVestibulinho);
+        }
+
+        function marcarVest(idx, letra) {
+            respostasVest[idx] = letra;
+            renderizarVestibulinho();
+        }
+
+        function finalizarVestibulinho() {
+            let acertos = 0;
+            questoesAtuais.forEach((q, idx) => {
+                if (respostasVest[idx] === q.gabarito) acertos++;
+            });
+            const nota = ((acertos / 45) * 100).toFixed(1);
+            alert(`🎯 NOTA: ${nota}% (Acertou ${acertos} de 45)`);
+            // Salva histórico
+            const historico = LS.get('vestibulinho_historico', []);
+            historico.push({ nota, data: hoje(), acertos, total: 45 });
+            LS.set('vestibulinho_historico', historico);
+            carregarRelatorios();
+        }
+
+        // =============================================================
+        //  RELATÓRIOS
+        // =============================================================
+        function carregarRelatorios() {
+            const sessoes = LS.get('sessoes', []);
+            const flashcards = LS.get('flashcards', []);
+            const totalMin = sessoes.reduce((acc, s) => acc + (s.duracao || 0), 0);
+            document.getElementById('rel-total').textContent = totalMin;
+            document.getElementById('rel-sessoes').textContent = sessoes.length;
+            document.getElementById('rel-flashcards').textContent = flashcards.length;
+
+            // Racha (dias seguidos)
+            const dias = [...new Set(sessoes.map(s => s.data))].sort();
+            let racha = 0;
+            if (dias.length) {
+                let atual = new Date();
+                let count = 0;
+                for (let i = dias.length - 1; i >= 0; i--) {
+                    const d = new Date(dias[i]);
+                    const diff = (atual - d) / (1000 * 60 * 60 * 24);
+                    if (diff < 1) { count++; } else break;
+                }
+                racha = count;
+            }
+            document.getElementById('racha-display').textContent = `🔥 ${racha} dias`;
+        }
+
+        // =============================================================
+        //  INICIALIZAÇÃO
+        // =============================================================
+        carregarRanking();
+        carregarFlashcards();
+        carregarRelatorios();
+
+        console.log('🚀 My Study IA rodando no GitHub Pages!');
+        console.log('⚠️ Lembre-se: sua chave Gemini está exposta no código.');
+    </script>
+</body>
+</html>
