@@ -104,7 +104,6 @@ function formatarMarkdown(texto) {
     // Listas ordenadas (1. item)
     html = html.replace(/^\d+\. (.*)/gm, '<li>$1</li>');
     html = html.replace(/(<li>.*<\/li>\n?)+/g, (match) => {
-        // Só converte se não for dentro de um <ul> já existente
         if (!match.includes('<ul>')) {
             return `<ol>${match}</ol>`;
         }
@@ -124,7 +123,6 @@ function formatarMarkdown(texto) {
         let tableHtml = '<table>';
         rows.forEach((row, ri) => {
             const cells = row.split('|').filter(c => c.trim() !== '');
-            // Pula linha de separação (|---|)
             if (cells.every(c => /^-+$/.test(c.trim()))) return;
             tableHtml += '<tr>';
             cells.forEach(cell => {
@@ -159,11 +157,14 @@ function formatarMarkdown(texto) {
 }
 
 // ================================================================
-//  CHAT COM IA (COM INDICADOR DE "PENSANDO")
+//  CHAT COM IA (COM INDICADOR DE "PENSANDO" E SALVANDO HISTÓRICO)
 // ================================================================
 const chatMensagens = document.getElementById('chat-mensagens');
 const chatInput = document.getElementById('chat-input');
 const btnChat = document.getElementById('btn-chat-enviar');
+
+// Chave para salvar o histórico no localStorage
+const CHAT_HISTORICO_KEY = 'chat_historico';
 
 function adicionarMensagem(texto, tipo, formatado = false) {
     const div = document.createElement('div');
@@ -175,8 +176,53 @@ function adicionarMensagem(texto, tipo, formatado = false) {
     }
     chatMensagens.appendChild(div);
     chatMensagens.scrollTop = chatMensagens.scrollHeight;
+    
+    // Salvar no localStorage
+    const historico = LS.get(CHAT_HISTORICO_KEY, []);
+    historico.push({ texto, tipo, formatado, timestamp: new Date().toISOString() });
+    LS.set(CHAT_HISTORICO_KEY, historico);
+    
     return div;
 }
+
+// Restaurar histórico do chat ao carregar a página
+function restaurarHistoricoChat() {
+    const historico = LS.get(CHAT_HISTORICO_KEY, []);
+    if (historico.length === 0) {
+        // Adiciona mensagem de boas-vindas se não houver histórico
+        adicionarMensagem('👋 Olá! Sou sua IA de estudos. Pergunte qualquer coisa!', 'ia', true);
+        return;
+    }
+    // Renderiza as mensagens salvas
+    historico.forEach(msg => {
+        const div = document.createElement('div');
+        div.className = `mensagem ${msg.tipo}`;
+        if (msg.formatado) {
+            div.innerHTML = formatarMarkdown(msg.texto);
+        } else {
+            div.textContent = msg.texto;
+        }
+        chatMensagens.appendChild(div);
+    });
+    chatMensagens.scrollTop = chatMensagens.scrollHeight;
+}
+
+// Limpar histórico do chat
+function limparHistoricoChat() {
+    LS.set(CHAT_HISTORICO_KEY, []);
+    chatMensagens.innerHTML = '';
+    adicionarMensagem('🗑️ Histórico limpo!', 'ia', true);
+}
+
+// Adicionar botão de limpar histórico (opcional)
+const btnLimparChat = document.createElement('button');
+btnLimparChat.textContent = '🗑️ Limpar Histórico';
+btnLimparChat.className = 'secondary';
+btnLimparChat.style.marginTop = '8px';
+btnLimparChat.style.fontSize = '12px';
+btnLimparChat.addEventListener('click', limparHistoricoChat);
+// Adiciona após o chat, dentro do card
+document.querySelector('#tab-chat .card').appendChild(btnLimparChat);
 
 async function enviarPergunta(pergunta) {
     if (!pergunta.trim()) return;
@@ -495,7 +541,7 @@ document.getElementById('btn-corrigir-redacao').addEventListener('click', async 
         Dê: Nota (0-1000), análise de estrutura (introdução/desenvolvimento/conclusão), erros gramaticais, 3 sugestões de melhoria e um trecho reescrito.
         `;
         const resultado = await chamarGroq(prompt);
-        document.getElementById('resultado-redacao').innerHTML = `<div class="card">${resultado.replace(/\n/g, '<br>')}</div>`;
+        document.getElementById('resultado-redacao').innerHTML = `<div class="card">${formatarMarkdown(resultado)}</div>`;
     } catch (e) {
         alert('Erro na correção. Veja o console (F12).');
         console.error(e);
@@ -505,10 +551,73 @@ document.getElementById('btn-corrigir-redacao').addEventListener('click', async 
 });
 
 // ================================================================
-//  VESTIBULINHO (COM VALIDAÇÃO ROBUSTA)
+//  VESTIBULINHO (COM EXTRAÇÃO ROBUSTA E RESULTADO FORMATADO)
 // ================================================================
 let questoesAtuais = [];
 let respostasVest = {};
+
+// Função para extrair JSON do texto da IA (mais robusta)
+function extrairJSON(texto) {
+    // Remove markdown de código
+    let limpo = texto.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    
+    // Tenta parsear diretamente
+    try {
+        return JSON.parse(limpo);
+    } catch (e) {}
+    
+    // Tenta encontrar um array com regex mais abrangente
+    const match = limpo.match(/\[\s*\{.*\}\s*\]/s);
+    if (match) {
+        try {
+            return JSON.parse(match[0]);
+        } catch (e2) {}
+    }
+    
+    // Tenta encontrar um objeto
+    const matchObj = limpo.match(/\{\s*".*"\s*:.*\}/s);
+    if (matchObj) {
+        try {
+            return JSON.parse(matchObj[0]);
+        } catch (e3) {}
+    }
+    
+    return null;
+}
+
+// Função para exibir resultado do vestibulinho formatado
+function exibirResultadoVestibulinho(nota, acertos, total, questoes, respostas) {
+    const container = document.getElementById('vestibulinho-container');
+    
+    let html = `
+    <div class="card" style="margin-top:20px; border-color: #7C3AED;">
+        <h4>📊 Resultado do Simulado</h4>
+        <div style="display:flex; gap:20px; flex-wrap:wrap; margin:16px 0;">
+            <div class="metric"><div class="value" style="color:#7C3AED;">${nota}%</div><div class="label">Nota final</div></div>
+            <div class="metric"><div class="value" style="color:#4ADE80;">${acertos}</div><div class="label">Acertos</div></div>
+            <div class="metric"><div class="value" style="color:#F87171;">${total - acertos}</div><div class="label">Erros</div></div>
+            <div class="metric"><div class="value">${total}</div><div class="label">Total</div></div>
+        </div>
+        <hr style="border-color:#2D2F3A; margin:12px 0;">
+        <h5>📝 Detalhamento</h5>
+        <ul style="padding-left:20px; color:#A1A1AA;">`;
+    
+    questoes.forEach((q, idx) => {
+        const escolhida = respostas[idx] || 'Não respondeu';
+        const acertou = escolhida === q.gabarito;
+        html += `<li style="margin:4px 0;">
+            <strong>Q${idx+1}</strong> – ${acertou ? '✅' : '❌'} 
+            Sua resposta: ${escolhida} | Correta: ${q.gabarito}
+            ${!acertou ? `<br><span style="color:#A1A1AA; font-size:13px;">${q.explicacao || ''}</span>` : ''}
+        </li>`;
+    });
+    
+    html += `</ul>
+        <button onclick="document.getElementById('btn-gerar-vest').click()" style="margin-top:16px;">🔄 Fazer outro simulado</button>
+    </div>`;
+    
+    container.innerHTML = html;
+}
 
 document.getElementById('btn-gerar-vest').addEventListener('click', async () => {
     const btn = document.getElementById('btn-gerar-vest');
@@ -526,12 +635,10 @@ document.getElementById('btn-gerar-vest').addEventListener('click', async () => 
         const texto = await chamarGroq(prompt);
         console.log('🔍 RESPOSTA BRUTA (Vestibulinho):', texto);
         
-        let dados = [];
-        try {
-            const limpo = texto.replace(/```json|```/g, '').trim();
-            dados = JSON.parse(limpo);
-        } catch (e) {
-            console.warn('⚠️ JSON do vestibulinho inválido. Tentando extrair array manualmente...');
+        let dados = extrairJSON(texto);
+        
+        if (!dados || !Array.isArray(dados) || dados.length === 0) {
+            // Fallback: tenta extrair manualmente com regex
             const match = texto.match(/\[\s*\{.*\}\s*\]/s);
             if (match) {
                 try {
@@ -548,12 +655,14 @@ document.getElementById('btn-gerar-vest').addEventListener('click', async () => 
             throw new Error('A IA não retornou um array válido de questões.');
         }
 
+        // Filtra apenas os que têm os campos mínimos
         questoesAtuais = dados.filter(q => q.enunciado && q.opcoes && q.opcoes.length === 5 && q.gabarito);
         
         if (questoesAtuais.length < 10) {
             throw new Error(`Apenas ${questoesAtuais.length} questões válidas foram geradas. Tente novamente.`);
         }
 
+        // Limita a 45
         questoesAtuais = questoesAtuais.slice(0, 45);
         respostasVest = {};
         renderizarVestibulinho();
@@ -614,11 +723,15 @@ function finalizarVestibulinho() {
         if (respostasVest[idx] === q.gabarito) acertos++;
     });
     const nota = ((acertos / questoesAtuais.length) * 100).toFixed(1);
-    alert(`🎯 NOTA: ${nota}% (Acertou ${acertos} de ${questoesAtuais.length})`);
+    
+    // Salva histórico
     const historico = LS.get('vestibulinho_historico', []);
     historico.push({ nota, data: hoje(), acertos, total: questoesAtuais.length });
     LS.set('vestibulinho_historico', historico);
     carregarRelatorios();
+    
+    // Exibe resultado formatado
+    exibirResultadoVestibulinho(nota, acertos, questoesAtuais.length, questoesAtuais, respostasVest);
 }
 
 // ================================================================
@@ -653,6 +766,7 @@ function carregarRelatorios() {
 carregarRanking();
 carregarFlashcards();
 carregarRelatorios();
+restaurarHistoricoChat(); // Restaura o histórico do chat
 
 console.log('🚀 My Study IA rodando com GROQ (modelo openai/gpt-oss-120b)');
-console.log('✅ Chat com formatação markdown e indicador de "pensando"');
+console.log('✅ Chat com histórico salvo | Vestibulinho com extração robusta e resultado formatado');
