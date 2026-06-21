@@ -1,6 +1,7 @@
 // ================================================================
 //  CONFIGURAÇÃO GROQ (CHAVE INSERIDA)
 // ================================================================
+// ⚠️ ATENÇÃO: Esta chave está exposta. Restrinja-a por domínio no console da Groq!
 const GROQ_API_KEY = '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';
 
 // ================================================================
@@ -46,7 +47,7 @@ document.querySelectorAll('.nav-item').forEach(btn => {
 });
 
 // ================================================================
-//  FUNÇÃO CHAMAR GROQ (MODELO LLAMA3-70B)
+//  FUNÇÃO CHAMAR GROQ (MODELO OPENAI/GPT-OSS-120B)
 // ================================================================
 async function chamarGroq(prompt, modelo = 'openai/gpt-oss-120b') {
     const url = 'https://api.groq.com/openai/v1/chat/completions';
@@ -586,5 +587,5 @@ carregarRanking();
 carregarFlashcards();
 carregarRelatorios();
 
-console.log('🚀 My Study IA rodando com GROQ (modelo llama3-70b-8192)');
+console.log('🚀 My Study IA rodando com GROQ (modelo openai/gpt-oss-120b)');
 console.log('✅ Resumo formatado | Flashcards = palavras-chave | Quiz interativo 5 alt | Vestibulinho validado');
