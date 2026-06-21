@@ -1,7 +1,6 @@
 // ================================================================
 //  CONFIGURAÇÃO GROQ (CHAVE INSERIDA)
 // ================================================================
-// ⚠️ ATENÇÃO: Esta chave está exposta. Restrinja-a por domínio no console da Groq!
 const GROQ_API_KEY = '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';
 
 // ================================================================
@@ -47,7 +46,7 @@ document.querySelectorAll('.nav-item').forEach(btn => {
 });
 
 // ================================================================
-//  FUNÇÃO CHAMAR GROQ (MODELO OPENAI/GPT-OSS-120B)
+//  FUNÇÃO CHAMAR GROQ (MODELO CORRETO: openai/gpt-oss-120b)
 // ================================================================
 async function chamarGroq(prompt, modelo = 'openai/gpt-oss-120b') {
     const url = 'https://api.groq.com/openai/v1/chat/completions';
@@ -86,18 +85,12 @@ async function chamarGroq(prompt, modelo = 'openai/gpt-oss-120b') {
 // ================================================================
 function formatarResumo(texto) {
     if (!texto) return '';
-    // Converte **negrito** para <strong>
     let html = texto.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    // Converte ## Título para <h4>
     html = html.replace(/^## (.*)/gm, '<h4>$1</h4>');
-    // Converte ### Título para <h5>
     html = html.replace(/^### (.*)/gm, '<h5>$1</h5>');
-    // Converte * listas para <ul><li>
     html = html.replace(/^\* (.*)/gm, '<li>$1</li>');
     html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
-    // Converte linhas com --- para <hr>
     html = html.replace(/^---$/gm, '<hr>');
-    // Converte quebras de linha para <br>
     html = html.replace(/\n/g, '<br>');
     return html;
 }
@@ -531,7 +524,6 @@ function renderizarVestibulinho() {
 
 function marcarVest(idx, letra) {
     respostasVest[idx] = letra;
-    // Atualiza contador
     const container = document.getElementById('vestibulinho-container');
     const p = container.querySelector('p');
     if (p) p.textContent = `${Object.keys(respostasVest).length} / ${questoesAtuais.length} respondidas`;
