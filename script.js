@@ -2,6 +2,7 @@
 //  CONFIGURAÇÃO
 // ================================================================
 // 🔑 COLOQUE SUA CHAVE AQUI (https://makersuite.google.com/app/apikey)
+// ⚠️ Dica: Restrinja-a por domínio no Google Cloud Console!
 const GEMINI_API_KEY = 'SUA_CHAVE_AQUI';
 
 // ================================================================
@@ -48,6 +49,29 @@ document.querySelectorAll('.nav-item').forEach(btn => {
 });
 
 // ================================================================
+//  FUNÇÃO CHAMAR GEMINI (COM LOG)
+// ================================================================
+async function chamarGemini(prompt) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+    const payload = {
+        contents: [{ parts: [{ text: prompt }] }]
+    };
+    const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+    if (!resp.ok) {
+        const erro = await resp.text();
+        throw new Error(`HTTP ${resp.status}: ${erro}`);
+    }
+    const data = await resp.json();
+    const texto = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!texto) throw new Error('Resposta vazia da IA');
+    return texto;
+}
+
+// ================================================================
 //  CHAT COM IA
 // ================================================================
 const chatMensagens = document.getElementById('chat-mensagens');
@@ -72,7 +96,7 @@ async function enviarPergunta(pergunta) {
         const resp = await chamarGemini(prompt);
         adicionarMensagem(resp, 'ia');
     } catch (e) {
-        adicionarMensagem('Erro ao obter resposta. Verifique sua chave.', 'ia');
+        adicionarMensagem('Erro ao obter resposta. Verifique sua chave e console (F12).', 'ia');
         console.error(e);
     }
 }
@@ -81,26 +105,6 @@ btnChat.addEventListener('click', () => enviarPergunta(chatInput.value));
 chatInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') enviarPergunta(chatInput.value);
 });
-
-// ================================================================
-//  FUNÇÃO CHAMAR GEMINI (genérica)
-// ================================================================
-async function chamarGemini(prompt) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-    const payload = {
-        contents: [{ parts: [{ text: prompt }] }]
-    };
-    const resp = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const data = await resp.json();
-    const texto = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!texto) throw new Error('Resposta vazia da IA');
-    return texto;
-}
 
 // ================================================================
 //  CRONÔMETRO
@@ -131,7 +135,7 @@ document.getElementById('btn-finalizar').addEventListener('click', () => {
 });
 
 // ================================================================
-//  PÓS-ESTUDO
+//  PÓS-ESTUDO (COM FALLBACK - AGORA MOSTRA TUDO!)
 // ================================================================
 document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
     const descricao = document.getElementById('descricao-estudo').value;
@@ -153,11 +157,23 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
         Retorne APENAS o JSON.
         `;
         const texto = await chamarGemini(prompt);
-        let resultado;
+        console.log('🔍 RESPOSTA BRUTA DA IA (Pós-estudo):', texto); // <-- OLHE AQUI NO CONSOLE (F12)
+
+        let resultado = {};
+        let jsonValido = false;
         try {
-            resultado = JSON.parse(texto.replace(/```json|```/g, '').trim());
+            // Tenta limpar e parsear
+            const limpo = texto.replace(/```json|```/g, '').trim();
+            resultado = JSON.parse(limpo);
+            jsonValido = true;
         } catch (e) {
-            resultado = { resumo: 'Erro ao processar', flashcards: [], quiz: [] };
+            console.warn('⚠️ JSON inválido. Usando fallback com texto puro.');
+            // FALLBACK: mostra o texto puro como resumo
+            resultado = {
+                resumo: texto.substring(0, 500) + (texto.length > 500 ? '...' : ''),
+                flashcards: ['Erro ao gerar flashcards|Tente novamente'],
+                quiz: [{ pergunta: 'Não foi possível gerar quiz.', opcoes: ['A) Tente', 'B) Novamente'], resposta_correta: 'A', explicacao: 'Verifique o console' }]
+            };
         }
 
         // Salvar sessão
@@ -172,7 +188,7 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
             const partes = c.split('|');
             flashcards.push({
                 pergunta: partes[0] || c,
-                resposta: partes[1] || '',
+                resposta: partes[1] || 'Clique para ver',
                 materia,
                 proxima_revisao: hoje(),
                 criado: hoje()
@@ -183,28 +199,39 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
         // Exibir resultado
         const div = document.getElementById('resultado-pos');
         let html = `<h4>📌 Resumo</h4><p>${resultado.resumo || 'Estudo registrado!'}</p>`;
+        
         html += `<h4>🃏 Flashcards</h4>`;
-        cards.forEach((c, i) => {
-            const partes = c.split('|');
-            const p = partes[0] || c;
-            const r = partes[1] || 'Clique para ver';
-            html += `<div class="flashcard-item" onclick="this.classList.toggle('aberto')">
-                <div class="pergunta">${i+1}. ${p}</div>
-                <div class="resposta">${r}</div>
-            </div>`;
-        });
+        if (cards.length > 0) {
+            cards.forEach((c, i) => {
+                const partes = c.split('|');
+                const p = partes[0] || c;
+                const r = partes[1] || 'Clique para ver';
+                html += `<div class="flashcard-item" onclick="this.classList.toggle('aberto')">
+                    <div class="pergunta">${i+1}. ${p}</div>
+                    <div class="resposta">${r}</div>
+                </div>`;
+            });
+        } else {
+            html += `<p style="color:#A1A1AA;">Nenhum flashcard gerado.</p>`;
+        }
+
         html += `<h4>📝 Quiz</h4>`;
-        (resultado.quiz || []).forEach(q => {
-            html += `<div class="questao-item"><strong>${q.pergunta}</strong><br>`;
-            (q.opcoes || []).forEach(o => { html += `▪ ${o} `; });
-            html += `<br><span style="color:#7C3AED;">✅ ${q.resposta_correta}</span> <span style="color:#A1A1AA;">${q.explicacao}</span></div>`;
-        });
+        const quiz = resultado.quiz || [];
+        if (quiz.length > 0) {
+            quiz.forEach(q => {
+                html += `<div class="questao-item"><strong>${q.pergunta}</strong><br>`;
+                (q.opcoes || []).forEach(o => { html += `▪ ${o} `; });
+                html += `<br><span style="color:#7C3AED;">✅ ${q.resposta_correta}</span> <span style="color:#A1A1AA;">${q.explicacao || ''}</span></div>`;
+            });
+        } else {
+            html += `<p style="color:#A1A1AA;">Nenhum quiz gerado.</p>`;
+        }
         div.innerHTML = html;
 
-        alert(`✅ Estudo finalizado! ${duracao} min em ${materia}. Flashcards salvos!`);
+        alert(`✅ Estudo finalizado! ${duracao} min em ${materia}.`);
 
     } catch (e) {
-        alert('Erro ao chamar a IA. Verifique sua chave ou conexão.');
+        alert('Erro ao chamar a IA. Verifique sua chave no console (F12).');
         console.error(e);
     }
     btn.textContent = '📝 Gerar Flashcards e Quiz';
@@ -306,7 +333,7 @@ document.getElementById('btn-corrigir-redacao').addEventListener('click', async 
         const resultado = await chamarGemini(prompt);
         document.getElementById('resultado-redacao').innerHTML = `<div class="card">${resultado.replace(/\n/g, '<br>')}</div>`;
     } catch (e) {
-        alert('Erro na correção.');
+        alert('Erro na correção. Veja o console (F12).');
         console.error(e);
     }
     btn.textContent = '📝 Corrigir Redação';
@@ -314,7 +341,7 @@ document.getElementById('btn-corrigir-redacao').addEventListener('click', async 
 });
 
 // ================================================================
-//  VESTIBULINHO (45 questões)
+//  VESTIBULINHO (COM FALLBACK)
 // ================================================================
 let questoesAtuais = [];
 let respostasVest = {};
@@ -331,15 +358,18 @@ document.getElementById('btn-gerar-vest').addEventListener('click', async () => 
         {"id":1, "enunciado":"...", "opcoes":["A) ...", "B) ...", "C) ...", "D) ...", "E) ..."], "gabarito":"A", "explicacao":"..."}.
         `;
         const texto = await chamarGemini(prompt);
+        console.log('🔍 RESPOSTA BRUTA (Vestibulinho):', texto);
         try {
-            questoesAtuais = JSON.parse(texto.replace(/```json|```/g, '').trim());
+            const limpo = texto.replace(/```json|```/g, '').trim();
+            questoesAtuais = JSON.parse(limpo);
         } catch (e) {
+            console.warn('⚠️ JSON do vestibulinho inválido. Usando fallback.');
             questoesAtuais = [];
         }
         respostasVest = {};
         renderizarVestibulinho();
     } catch (e) {
-        alert('Erro ao gerar simulado.');
+        alert('Erro ao gerar simulado. Veja o console.');
         console.error(e);
     }
     btn.textContent = '🔄 Gerar Simulado';
@@ -349,11 +379,11 @@ document.getElementById('btn-gerar-vest').addEventListener('click', async () => 
 function renderizarVestibulinho() {
     const container = document.getElementById('vestibulinho-container');
     if (!questoesAtuais.length) {
-        container.innerHTML = '<p>Clique em "Gerar Simulado" para começar.</p>';
+        container.innerHTML = '<p>⚠️ Não foi possível gerar as questões. Clique em "Gerar" novamente ou veja o console (F12).</p>';
         return;
     }
     let html = `<p style="color:#A1A1AA;">${Object.keys(respostasVest).length} / 45 respondidas</p>`;
-    questoesAtuais.forEach((q, idx) => {
+    questoesAtuais.slice(0, 45).forEach((q, idx) => {
         html += `<div class="questao-item">
             <strong>Q${idx+1}. ${q.enunciado}</strong>
             <div>`;
@@ -377,7 +407,7 @@ function marcarVest(idx, letra) {
 
 function finalizarVestibulinho() {
     let acertos = 0;
-    questoesAtuais.forEach((q, idx) => {
+    questoesAtuais.slice(0, 45).forEach((q, idx) => {
         if (respostasVest[idx] === q.gabarito) acertos++;
     });
     const nota = ((acertos / 45) * 100).toFixed(1);
@@ -399,7 +429,6 @@ function carregarRelatorios() {
     document.getElementById('rel-sessoes').textContent = sessoes.length;
     document.getElementById('rel-flashcards').textContent = flashcards.length;
 
-    // Racha (dias seguidos)
     const dias = [...new Set(sessoes.map(s => s.data))].sort();
     let racha = 0;
     if (dias.length) {
@@ -422,5 +451,5 @@ carregarRanking();
 carregarFlashcards();
 carregarRelatorios();
 
-console.log('🚀 My Study IA rodando no GitHub Pages!');
-console.log('⚠️ Lembre-se: sua chave Gemini está exposta no código.');
+console.log('🚀 My Study IA rodando!');
+console.log('⚠️ Se algo não aparecer, olhe os logs ACIMA.');
