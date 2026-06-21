@@ -2,6 +2,7 @@
 //  CONFIGURAÇÃO GROQ (CHAVE INSERIDA)
 // ================================================================
 // ⚠️ ATENÇÃO: Esta chave está exposta. Restrinja-a por domínio no console da Groq!
+// 🔑 Se você compartilhou essa chave publicamente, revogue-a e crie uma nova.
 const GROQ_API_KEY = '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';
 
 // ================================================================
@@ -48,9 +49,9 @@ document.querySelectorAll('.nav-item').forEach(btn => {
 });
 
 // ================================================================
-//  FUNÇÃO CHAMAR GROQ
+//  FUNÇÃO CHAMAR GROQ (MODELO ATUALIZADO)
 // ================================================================
-async function chamarGroq(prompt, modelo = 'mixtral-8x7b-32768') {
+async function chamarGroq(prompt, modelo = 'llama3-70b-8192') {
     const url = 'https://api.groq.com/openai/v1/chat/completions';
     const payload = {
         model: modelo,
@@ -457,5 +458,5 @@ carregarRanking();
 carregarFlashcards();
 carregarRelatorios();
 
-console.log('🚀 My Study IA rodando com GROQ!');
+console.log('🚀 My Study IA rodando com GROQ (modelo llama3-70b-8192)!');
 console.log('⚠️ Chave API inserida. Restrinja por domínio no console da Groq.');
