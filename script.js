@@ -87,30 +87,19 @@ function formatarMarkdown(texto) {
     if (!texto) return '';
     let html = texto;
     
-    // Títulos ## e ###
     html = html.replace(/^### (.*)/gm, '<h5>$1</h5>');
     html = html.replace(/^## (.*)/gm, '<h4>$1</h4>');
-    
-    // Negrito **
     html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    
-    // Itálico *
     html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
-    
-    // Listas não ordenadas (* item)
     html = html.replace(/^\* (.*)/gm, '<li>$1</li>');
     html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
-    
-    // Listas ordenadas (1. item)
     html = html.replace(/^\d+\. (.*)/gm, '<li>$1</li>');
     html = html.replace(/(<li>.*<\/li>\n?)+/g, (match) => {
-        if (!match.includes('<ul>')) {
-            return `<ol>${match}</ol>`;
-        }
+        if (!match.includes('<ul>')) return `<ol>${match}</ol>`;
         return match;
     });
     
-    // Tabelas (simples: linhas com |)
+    // Tabelas
     const tableRegex = /^\|.*\|$/gm;
     let tableMatch;
     let tables = [];
@@ -135,24 +124,15 @@ function formatarMarkdown(texto) {
         html = html.replace(t, tableHtml);
     });
     
-    // Linhas com --- para <hr>
     html = html.replace(/^---$/gm, '<hr>');
-    
-    // Código inline (backticks)
     html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-    
-    // Blocos de código (```)
     html = html.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
-    
-    // Quebras de linha duplas para parágrafos
     html = html.replace(/\n\n/g, '</p><p>');
     html = html.replace(/\n/g, '<br>');
     
-    // Envolve em <p> se não tiver tags de bloco
     if (!html.startsWith('<') && !html.startsWith('</')) {
         html = `<p>${html}</p>`;
     }
-    
     return html;
 }
 
@@ -163,7 +143,6 @@ const chatMensagens = document.getElementById('chat-mensagens');
 const chatInput = document.getElementById('chat-input');
 const btnChat = document.getElementById('btn-chat-enviar');
 
-// Chave para salvar o histórico no localStorage
 const CHAT_HISTORICO_KEY = 'chat_historico';
 
 function adicionarMensagem(texto, tipo, formatado = false) {
@@ -177,23 +156,18 @@ function adicionarMensagem(texto, tipo, formatado = false) {
     chatMensagens.appendChild(div);
     chatMensagens.scrollTop = chatMensagens.scrollHeight;
     
-    // Salvar no localStorage
     const historico = LS.get(CHAT_HISTORICO_KEY, []);
     historico.push({ texto, tipo, formatado, timestamp: new Date().toISOString() });
     LS.set(CHAT_HISTORICO_KEY, historico);
-    
     return div;
 }
 
-// Restaurar histórico do chat ao carregar a página
 function restaurarHistoricoChat() {
     const historico = LS.get(CHAT_HISTORICO_KEY, []);
     if (historico.length === 0) {
-        // Adiciona mensagem de boas-vindas se não houver histórico
         adicionarMensagem('👋 Olá! Sou sua IA de estudos. Pergunte qualquer coisa!', 'ia', true);
         return;
     }
-    // Renderiza as mensagens salvas
     historico.forEach(msg => {
         const div = document.createElement('div');
         div.className = `mensagem ${msg.tipo}`;
@@ -207,21 +181,19 @@ function restaurarHistoricoChat() {
     chatMensagens.scrollTop = chatMensagens.scrollHeight;
 }
 
-// Limpar histórico do chat
 function limparHistoricoChat() {
     LS.set(CHAT_HISTORICO_KEY, []);
     chatMensagens.innerHTML = '';
     adicionarMensagem('🗑️ Histórico limpo!', 'ia', true);
 }
 
-// Adicionar botão de limpar histórico (opcional)
+// Botão limpar chat
 const btnLimparChat = document.createElement('button');
 btnLimparChat.textContent = '🗑️ Limpar Histórico';
 btnLimparChat.className = 'secondary';
 btnLimparChat.style.marginTop = '8px';
 btnLimparChat.style.fontSize = '12px';
 btnLimparChat.addEventListener('click', limparHistoricoChat);
-// Adiciona após o chat, dentro do card
 document.querySelector('#tab-chat .card').appendChild(btnLimparChat);
 
 async function enviarPergunta(pergunta) {
@@ -229,7 +201,6 @@ async function enviarPergunta(pergunta) {
     adicionarMensagem(pergunta, 'usuario');
     chatInput.value = '';
 
-    // --- Adiciona indicador de "pensando" ---
     const loadingDiv = document.createElement('div');
     loadingDiv.className = 'mensagem ia';
     loadingDiv.innerHTML = '⏳ <em>Pensando...</em>';
@@ -240,11 +211,7 @@ async function enviarPergunta(pergunta) {
     try {
         const prompt = `Responda de forma clara e didática. Use markdown para organizar a resposta (títulos ##, negrito **, listas com *, tabelas com |). ${pergunta}`;
         const resp = await chamarGroq(prompt);
-        
-        // Remove o indicador de "pensando"
         loadingDiv.remove();
-        
-        // Adiciona a resposta formatada
         adicionarMensagem(resp, 'ia', true);
     } catch (e) {
         loadingDiv.innerHTML = '❌ <em>Erro ao obter resposta. Verifique sua chave e console (F12).</em>';
@@ -287,7 +254,7 @@ document.getElementById('btn-finalizar').addEventListener('click', () => {
 });
 
 // ================================================================
-//  PÓS-ESTUDO (RESUMO FORMATADO + FLASHCARDS PALAVRAS-CHAVE + QUIZ INTERATIVO)
+//  PÓS-ESTUDO
 // ================================================================
 document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
     const descricao = document.getElementById('descricao-estudo').value;
@@ -302,13 +269,9 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
         const prompt = `
         O aluno estudou por ${duracao} minutos. Descrição do conteúdo estudado: "${descricao}".
         Com base APENAS nessa descrição, gere um JSON com:
-        1. "resumo": um resumo claro e didático do conteúdo (pode usar títulos, negrito, listas, mas mantenha texto puro, sem formatação especial, apenas markdown simples com ##, ** e *).
-        2. "flashcards": lista de 5 strings no formato "Palavra-chave|Explicação breve" – palavras‑chave que ajudem a lembrar do conteúdo.
-        3. "quiz": lista de 3 objetos. Cada objeto deve ter:
-           - "pergunta": uma pergunta sobre o conteúdo descrito.
-           - "opcoes": um array com 5 alternativas (A, B, C, D, E) – cada string deve começar com a letra e um parêntese (ex: "A) ...").
-           - "resposta_correta": a letra da alternativa correta (ex: "A").
-           - "explicacao": por que essa é a resposta correta.
+        1. "resumo": um resumo claro e didático do conteúdo (use markdown simples: ##, **, *).
+        2. "flashcards": lista de 5 strings no formato "Palavra-chave|Explicação breve".
+        3. "quiz": lista de 3 objetos com "pergunta", "opcoes" (5 alternativas A-E), "resposta_correta" e "explicacao".
         Retorne APENAS o JSON.
         `;
         const texto = await chamarGroq(prompt);
@@ -332,12 +295,10 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
             };
         }
 
-        // Salvar sessão
         const sessoes = LS.get('sessoes', []);
         sessoes.push({ materia: 'Geral', duracao, descricao, data: hoje() });
         LS.set('sessoes', sessoes);
 
-        // Salvar flashcards (palavras-chave)
         const flashcards = LS.get('flashcards', []);
         const cards = resultado.flashcards || [];
         cards.forEach(c => {
@@ -352,14 +313,9 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
         });
         LS.set('flashcards', flashcards);
 
-        // --- EXIBIR RESULTADO ---
         const div = document.getElementById('resultado-pos');
         let html = '';
-
-        // 1. Resumo formatado
         html += `<div class="resumo-formatado"><h4>📌 Resumo</h4>${formatarMarkdown(resultado.resumo || 'Estudo registrado!')}</div>`;
-
-        // 2. Flashcards (palavras-chave)
         html += `<h4>🔑 Palavras‑chave (Flashcards)</h4>`;
         if (cards.length > 0) {
             cards.forEach((c, i) => {
@@ -375,7 +331,6 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
             html += `<p style="color:#A1A1AA;">Nenhum flashcard gerado.</p>`;
         }
 
-        // 3. Quiz interativo (5 alternativas)
         html += `<h4>📝 Quiz (clique em uma alternativa)</h4>`;
         const quiz = resultado.quiz || [];
         if (quiz.length > 0) {
@@ -386,7 +341,7 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
                     <div style="margin-top:8px;">`;
                 if (q.opcoes && q.opcoes.length === 5) {
                     q.opcoes.forEach((op, oi) => {
-                        const letra = String.fromCharCode(65 + oi); // A, B, C, D, E
+                        const letra = String.fromCharCode(65 + oi);
                         html += `
                         <div class="opcao" data-idx="${idx}" data-letra="${letra}" data-correta="${q.resposta_correta}" data-explicacao="${q.explicacao || ''}">
                             ${op}
@@ -403,10 +358,8 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
         } else {
             html += `<p style="color:#A1A1AA;">Nenhum quiz gerado.</p>`;
         }
-
         div.innerHTML = html;
 
-        // Adicionar eventos de clique nas opções do quiz
         document.querySelectorAll('.opcao').forEach(el => {
             el.addEventListener('click', function() {
                 const idx = this.dataset.idx;
@@ -419,9 +372,7 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
                 parent.querySelectorAll('.opcao').forEach(opt => {
                     opt.classList.remove('selecionada', 'correta', 'errada');
                 });
-                
                 this.classList.add('selecionada');
-                
                 feedback.style.display = 'block';
                 if (letraEscolhida === correta) {
                     this.classList.add('correta');
@@ -438,7 +389,7 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
             });
         });
 
-        alert(`✅ Estudo finalizado! ${duracao} min. Flashcards e quiz gerados a partir da sua descrição.`);
+        alert(`✅ Estudo finalizado! ${duracao} min.`);
 
     } catch (e) {
         alert('Erro ao chamar a Groq. Verifique sua chave no console (F12).');
@@ -485,7 +436,7 @@ document.getElementById('btn-add-ranking').addEventListener('click', () => {
 });
 
 // ================================================================
-//  FLASHCARDS (REVISÃO ESPAÇADA)
+//  FLASHCARDS
 // ================================================================
 function carregarFlashcards() {
     const todos = LS.get('flashcards', []);
@@ -551,37 +502,62 @@ document.getElementById('btn-corrigir-redacao').addEventListener('click', async 
 });
 
 // ================================================================
-//  VESTIBULINHO (COM EXTRAÇÃO ROBUSTA E RESULTADO FORMATADO)
+//  VESTIBULINHO (COM EXTRAÇÃO SUPER ROBUSTA)
 // ================================================================
 let questoesAtuais = [];
 let respostasVest = {};
 
-// Função para extrair JSON do texto da IA (mais robusta)
-function extrairJSON(texto) {
-    // Remove markdown de código
+// Função EXTRA FORTE para extrair JSON – tenta 5 estratégias diferentes
+function extrairJSONSuper(texto) {
+    // Estratégia 1: Remove blocos de código e tenta parse direto
     let limpo = texto.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-    
-    // Tenta parsear diretamente
     try {
-        return JSON.parse(limpo);
+        const parsed = JSON.parse(limpo);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (parsed.questoes && Array.isArray(parsed.questoes)) return parsed.questoes;
+        if (parsed.questions && Array.isArray(parsed.questions)) return parsed.questions;
+        return parsed;
     } catch (e) {}
-    
-    // Tenta encontrar um array com regex mais abrangente
-    const match = limpo.match(/\[\s*\{.*\}\s*\]/s);
-    if (match) {
+
+    // Estratégia 2: Procura por um array com regex (mais abrangente)
+    const arrayMatch = limpo.match(/\[\s*\{[\s\S]*\}\s*\]/);
+    if (arrayMatch) {
         try {
-            return JSON.parse(match[0]);
-        } catch (e2) {}
+            const parsed = JSON.parse(arrayMatch[0]);
+            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        } catch (e) {}
     }
-    
-    // Tenta encontrar um objeto
-    const matchObj = limpo.match(/\{\s*".*"\s*:.*\}/s);
-    if (matchObj) {
+
+    // Estratégia 3: Procura por um objeto que contém um array de questões
+    const objMatch = limpo.match(/\{\s*"(?:questoes|questions|itens|items)"\s*:\s*\[[\s\S]*\]\s*\}/);
+    if (objMatch) {
         try {
-            return JSON.parse(matchObj[0]);
-        } catch (e3) {}
+            const parsed = JSON.parse(objMatch[0]);
+            if (parsed.questoes && Array.isArray(parsed.questoes)) return parsed.questoes;
+            if (parsed.questions && Array.isArray(parsed.questions)) return parsed.questions;
+            if (parsed.itens && Array.isArray(parsed.itens)) return parsed.itens;
+            if (parsed.items && Array.isArray(parsed.items)) return parsed.items;
+        } catch (e) {}
     }
-    
+
+    // Estratégia 4: Tenta extrair múltiplos objetos individuais e montar um array
+    const objectMatches = limpo.match(/\{[^{}]*"enunciado"[^{}]*\}/g);
+    if (objectMatches && objectMatches.length > 0) {
+        try {
+            const arr = objectMatches.map(obj => JSON.parse(obj));
+            if (arr.length > 0) return arr;
+        } catch (e) {}
+    }
+
+    // Estratégia 5: Fallback – tenta encontrar qualquer coisa que pareça um array
+    const fallbackMatch = limpo.match(/\[[\s\S]*\]/);
+    if (fallbackMatch) {
+        try {
+            const parsed = JSON.parse(fallbackMatch[0]);
+            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        } catch (e) {}
+    }
+
     return null;
 }
 
@@ -600,7 +576,7 @@ function exibirResultadoVestibulinho(nota, acertos, total, questoes, respostas) 
         </div>
         <hr style="border-color:#2D2F3A; margin:12px 0;">
         <h5>📝 Detalhamento</h5>
-        <ul style="padding-left:20px; color:#A1A1AA;">`;
+        <ul style="padding-left:20px; color:#A1A1AA; max-height:300px; overflow-y:auto;">`;
     
     questoes.forEach((q, idx) => {
         const escolhida = respostas[idx] || 'Não respondeu';
@@ -635,15 +611,17 @@ document.getElementById('btn-gerar-vest').addEventListener('click', async () => 
         const texto = await chamarGroq(prompt);
         console.log('🔍 RESPOSTA BRUTA (Vestibulinho):', texto);
         
-        let dados = extrairJSON(texto);
+        // Usa a função super robusta
+        let dados = extrairJSONSuper(texto);
         
+        // Se ainda não funcionou, tenta uma última vez com um parser mais agressivo
         if (!dados || !Array.isArray(dados) || dados.length === 0) {
-            // Fallback: tenta extrair manualmente com regex
-            const match = texto.match(/\[\s*\{.*\}\s*\]/s);
+            console.warn('⚠️ Tentando extração manual com regex...');
+            const match = texto.match(/\[\s*\{[\s\S]*\}\s*\]/);
             if (match) {
                 try {
                     dados = JSON.parse(match[0]);
-                } catch (e2) {
+                } catch (e) {
                     dados = [];
                 }
             } else {
@@ -656,20 +634,28 @@ document.getElementById('btn-gerar-vest').addEventListener('click', async () => 
         }
 
         // Filtra apenas os que têm os campos mínimos
-        questoesAtuais = dados.filter(q => q.enunciado && q.opcoes && q.opcoes.length === 5 && q.gabarito);
+        questoesAtuais = dados.filter(q => 
+            q.enunciado && 
+            q.opcoes && 
+            q.opcoes.length === 5 && 
+            q.gabarito &&
+            q.explicacao
+        );
         
-        if (questoesAtuais.length < 10) {
+        if (questoesAtuais.length < 5) {
             throw new Error(`Apenas ${questoesAtuais.length} questões válidas foram geradas. Tente novamente.`);
         }
 
         // Limita a 45
-        questoesAtuais = questoesAtuais.slice(0, 45);
+        if (questoesAtuais.length > 45) {
+            questoesAtuais = questoesAtuais.slice(0, 45);
+        }
         respostasVest = {};
         renderizarVestibulinho();
 
     } catch (e) {
+        console.error('❌ Erro detalhado:', e);
         alert(`❌ Erro: ${e.message || 'Não foi possível gerar o simulado. Tente novamente.'}`);
-        console.error(e);
         document.getElementById('vestibulinho-container').innerHTML = `
             <p style="color:#F87171;">❌ Não foi possível gerar as questões. Verifique o console (F12) para mais detalhes.</p>
             <button onclick="document.getElementById('btn-gerar-vest').click()" style="margin-top:12px;">🔄 Tentar Novamente</button>
@@ -724,13 +710,11 @@ function finalizarVestibulinho() {
     });
     const nota = ((acertos / questoesAtuais.length) * 100).toFixed(1);
     
-    // Salva histórico
     const historico = LS.get('vestibulinho_historico', []);
     historico.push({ nota, data: hoje(), acertos, total: questoesAtuais.length });
     LS.set('vestibulinho_historico', historico);
     carregarRelatorios();
     
-    // Exibe resultado formatado
     exibirResultadoVestibulinho(nota, acertos, questoesAtuais.length, questoesAtuais, respostasVest);
 }
 
@@ -766,7 +750,7 @@ function carregarRelatorios() {
 carregarRanking();
 carregarFlashcards();
 carregarRelatorios();
-restaurarHistoricoChat(); // Restaura o histórico do chat
+restaurarHistoricoChat();
 
 console.log('🚀 My Study IA rodando com GROQ (modelo openai/gpt-oss-120b)');
-console.log('✅ Chat com histórico salvo | Vestibulinho com extração robusta e resultado formatado');
+console.log('✅ Chat com histórico | Vestibulinho com extração SUPER robusta');
