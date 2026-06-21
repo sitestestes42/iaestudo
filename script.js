@@ -597,7 +597,7 @@ function exibirResultadoVestibulinho(nota, acertos, total, questoes, respostas) 
 
 document.getElementById('btn-gerar-vest').addEventListener('click', async () => {
     const btn = document.getElementById('btn-gerar-vest');
-    btn.textContent = '⏳ Gerando 45 questões...';
+    btn.textContent = '⏳ Gerando questões...';
     btn.disabled = true;
 
     try {
