@@ -1,9 +1,8 @@
 // ================================================================
-//  CONFIGURAÇÃO
+//  CONFIGURAÇÃO GROQ (CHAVE INSERIDA)
 // ================================================================
-// 🔑 COLOQUE SUA CHAVE AQUI (https://makersuite.google.com/app/apikey)
-// ⚠️ Dica: Restrinja-a por domínio no Google Cloud Console!
-const GEMINI_API_KEY = 'SUA_CHAVE_AQUI';
+// ⚠️ ATENÇÃO: Esta chave está exposta. Restrinja-a por domínio no console da Groq!
+const GROQ_API_KEY = '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';
 
 // ================================================================
 //  UTILITÁRIOS
@@ -49,24 +48,36 @@ document.querySelectorAll('.nav-item').forEach(btn => {
 });
 
 // ================================================================
-//  FUNÇÃO CHAMAR GEMINI (COM LOG)
+//  FUNÇÃO CHAMAR GROQ
 // ================================================================
-async function chamarGemini(prompt) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+async function chamarGroq(prompt, modelo = 'mixtral-8x7b-32768') {
+    const url = 'https://api.groq.com/openai/v1/chat/completions';
     const payload = {
-        contents: [{ parts: [{ text: prompt }] }]
+        model: modelo,
+        messages: [
+            { role: 'system', content: 'Você é um assistente de estudos útil e didático.' },
+            { role: 'user', content: prompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 2048
     };
+
     const resp = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${GROQ_API_KEY}`
+        },
         body: JSON.stringify(payload)
     });
+
     if (!resp.ok) {
         const erro = await resp.text();
         throw new Error(`HTTP ${resp.status}: ${erro}`);
     }
+
     const data = await resp.json();
-    const texto = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    const texto = data.choices?.[0]?.message?.content;
     if (!texto) throw new Error('Resposta vazia da IA');
     return texto;
 }
@@ -93,7 +104,7 @@ async function enviarPergunta(pergunta) {
 
     try {
         const prompt = `Responda de forma clara e didática: ${pergunta}`;
-        const resp = await chamarGemini(prompt);
+        const resp = await chamarGroq(prompt);
         adicionarMensagem(resp, 'ia');
     } catch (e) {
         adicionarMensagem('Erro ao obter resposta. Verifique sua chave e console (F12).', 'ia');
@@ -135,7 +146,7 @@ document.getElementById('btn-finalizar').addEventListener('click', () => {
 });
 
 // ================================================================
-//  PÓS-ESTUDO (COM FALLBACK - AGORA MOSTRA TUDO!)
+//  PÓS-ESTUDO
 // ================================================================
 document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
     const descricao = document.getElementById('descricao-estudo').value;
@@ -156,21 +167,17 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
         3. "quiz": lista de 3 objetos com "pergunta", "opcoes" (array de 4), "resposta_correta" e "explicacao".
         Retorne APENAS o JSON.
         `;
-        const texto = await chamarGemini(prompt);
-        console.log('🔍 RESPOSTA BRUTA DA IA (Pós-estudo):', texto); // <-- OLHE AQUI NO CONSOLE (F12)
+        const texto = await chamarGroq(prompt);
+        console.log('🔍 RESPOSTA BRUTA (Pós-estudo):', texto);
 
         let resultado = {};
-        let jsonValido = false;
         try {
-            // Tenta limpar e parsear
             const limpo = texto.replace(/```json|```/g, '').trim();
             resultado = JSON.parse(limpo);
-            jsonValido = true;
         } catch (e) {
-            console.warn('⚠️ JSON inválido. Usando fallback com texto puro.');
-            // FALLBACK: mostra o texto puro como resumo
+            console.warn('⚠️ JSON inválido. Usando fallback.');
             resultado = {
-                resumo: texto.substring(0, 500) + (texto.length > 500 ? '...' : ''),
+                resumo: texto.substring(0, 500),
                 flashcards: ['Erro ao gerar flashcards|Tente novamente'],
                 quiz: [{ pergunta: 'Não foi possível gerar quiz.', opcoes: ['A) Tente', 'B) Novamente'], resposta_correta: 'A', explicacao: 'Verifique o console' }]
             };
@@ -199,7 +206,6 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
         // Exibir resultado
         const div = document.getElementById('resultado-pos');
         let html = `<h4>📌 Resumo</h4><p>${resultado.resumo || 'Estudo registrado!'}</p>`;
-        
         html += `<h4>🃏 Flashcards</h4>`;
         if (cards.length > 0) {
             cards.forEach((c, i) => {
@@ -231,7 +237,7 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
         alert(`✅ Estudo finalizado! ${duracao} min em ${materia}.`);
 
     } catch (e) {
-        alert('Erro ao chamar a IA. Verifique sua chave no console (F12).');
+        alert('Erro ao chamar a Groq. Verifique sua chave no console (F12).');
         console.error(e);
     }
     btn.textContent = '📝 Gerar Flashcards e Quiz';
@@ -330,7 +336,7 @@ document.getElementById('btn-corrigir-redacao').addEventListener('click', async 
         ${texto}
         Dê: Nota (0-1000), análise de estrutura (introdução/desenvolvimento/conclusão), erros gramaticais, 3 sugestões de melhoria e um trecho reescrito.
         `;
-        const resultado = await chamarGemini(prompt);
+        const resultado = await chamarGroq(prompt);
         document.getElementById('resultado-redacao').innerHTML = `<div class="card">${resultado.replace(/\n/g, '<br>')}</div>`;
     } catch (e) {
         alert('Erro na correção. Veja o console (F12).');
@@ -341,7 +347,7 @@ document.getElementById('btn-corrigir-redacao').addEventListener('click', async 
 });
 
 // ================================================================
-//  VESTIBULINHO (COM FALLBACK)
+//  VESTIBULINHO
 // ================================================================
 let questoesAtuais = [];
 let respostasVest = {};
@@ -357,7 +363,7 @@ document.getElementById('btn-gerar-vest').addEventListener('click', async () => 
         Retorne APENAS um JSON com uma lista de 45 objetos. Cada objeto: 
         {"id":1, "enunciado":"...", "opcoes":["A) ...", "B) ...", "C) ...", "D) ...", "E) ..."], "gabarito":"A", "explicacao":"..."}.
         `;
-        const texto = await chamarGemini(prompt);
+        const texto = await chamarGroq(prompt);
         console.log('🔍 RESPOSTA BRUTA (Vestibulinho):', texto);
         try {
             const limpo = texto.replace(/```json|```/g, '').trim();
@@ -451,5 +457,5 @@ carregarRanking();
 carregarFlashcards();
 carregarRelatorios();
 
-console.log('🚀 My Study IA rodando!');
-console.log('⚠️ Se algo não aparecer, olhe os logs ACIMA.');
+console.log('🚀 My Study IA rodando com GROQ!');
+console.log('⚠️ Chave API inserida. Restrinja por domínio no console da Groq.');
