@@ -1,125 +1,265 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>📚 My Study IA</title>
-    <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>StudyAI – Sua IA de Estudos</title>
+    <link rel="stylesheet" href="style.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-    <!-- Sidebar -->
-    <div class="sidebar">
-        <div class="logo">📚 My Study <span>GitHub Pages</span></div>
-        <div class="user-info">
-            👤 <strong>Você</strong>
-            <span id="racha-display" style="display:block;font-size:12px;color:#A1A1AA;">🔥 0 dias</span>
+
+    <!-- ============================================ -->
+    <!-- TELA DE LOGIN -->
+    <!-- ============================================ -->
+    <div id="tela-login" class="tela-login">
+        <div class="login-container">
+            <div class="login-logo">📚</div>
+            <h1>Study<span>AI</span></h1>
+            <p class="login-subtitle">Sua IA pessoal para estudos</p>
+
+            <div class="login-card">
+                <input type="email" id="login-email" placeholder="Seu e-mail" />
+                <input type="password" id="login-senha" placeholder="Sua senha" />
+                <button id="login-btn" class="btn-primary">🚀 Entrar</button>
+                <div class="login-divider">ou</div>
+                <button id="login-google-btn" class="btn-google">🔵 Entrar com Google</button>
+                <div class="login-links">
+                    <a href="#" id="mostrar-cadastro">Criar conta</a>
+                    <a href="#" id="mostrar-recuperar">Esqueci a senha</a>
+                </div>
+                <p class="login-hint" id="login-mensagem"></p>
+            </div>
+
+            <div class="login-footer">
+                <span>✨ Gratuito • StudyAI v2.0</span>
+            </div>
         </div>
-        <button class="nav-item active" data-tab="estudo">⏱️ Estudo</button>
-        <button class="nav-item" data-tab="chat">💬 Chat IA</button>
-        <button class="nav-item" data-tab="grupo">🏆 Grupo</button>
-        <button class="nav-item" data-tab="flashcards">🃏 Flashcards</button>
-        <button class="nav-item" data-tab="redacao">✍️ Redação</button>
-        <button class="nav-item" data-tab="vestibulinho">📊 Vestibulinho</button>
-        <button class="nav-item" data-tab="relatorios">📈 Relatórios</button>
-        <div class="footer">🚀 Simples • LocalStorage</div>
     </div>
 
-    <!-- Conteúdo principal -->
-    <div class="main-content">
+    <!-- ============================================ -->
+    <!-- APLICATIVO PRINCIPAL -->
+    <!-- ============================================ -->
+    <div id="app-principal" style="display:none;">
 
-        <!-- TAB ESTUDO -->
-        <div id="tab-estudo" class="tab-content active">
-            <h1>⏱️ Sessão de Estudo</h1>
-            <p class="subtitle">Foque, estude e no final a IA gera flashcards e quiz baseados no que você descrever.</p>
-            <div class="card">
-                <div class="flex-row">
-                    <div style="flex:1;">
-                        <label>📚 Estudo</label>
-                        <div style="background:#0E1117; padding:10px 14px; border-radius:10px; border:1px solid #2D2F3A; color:#A1A1AA;">
-                            Descreva abaixo o que estudou
+        <!-- TOP BAR -->
+        <header class="top-bar">
+            <div class="top-bar-left">
+                <div class="logo-small">📚 Study<span>AI</span></div>
+            </div>
+            <div class="top-bar-center">
+                <span class="user-greeting" id="saudacao-topo">Olá, <strong>Usuário</strong> 👋</span>
+            </div>
+            <div class="top-bar-right">
+                <button id="btn-sair" class="btn-sair">🚪 Sair</button>
+            </div>
+        </header>
+
+        <!-- SIDEBAR + CONTEÚDO -->
+        <div class="app-body">
+
+            <!-- SIDEBAR -->
+            <nav class="sidebar" id="sidebar">
+                <ul>
+                    <li class="nav-item active" data-tab="chat">
+                        <span class="nav-icon">💬</span>
+                        <span class="nav-text">Chat</span>
+                    </li>
+                    <li class="nav-item" data-tab="estudo">
+                        <span class="nav-icon">⏱️</span>
+                        <span class="nav-text">Estudo</span>
+                    </li>
+                    <li class="nav-item" data-tab="flashcards">
+                        <span class="nav-icon">🃏</span>
+                        <span class="nav-text">Flashcards</span>
+                    </li>
+                    <li class="nav-item" data-tab="redacao">
+                        <span class="nav-icon">✍️</span>
+                        <span class="nav-text">Redação</span>
+                    </li>
+                    <li class="nav-item" data-tab="vestibulinho">
+                        <span class="nav-icon">📊</span>
+                        <span class="nav-text">Vestibulinho</span>
+                    </li>
+                    <li class="nav-item" data-tab="grupo">
+                        <span class="nav-icon">👥</span>
+                        <span class="nav-text">Grupo</span>
+                    </li>
+                    <li class="nav-item" data-tab="aulas">
+                        <span class="nav-icon">🎬</span>
+                        <span class="nav-text">Aulas</span>
+                    </li>
+                    <li class="nav-item" data-tab="relatorios">
+                        <span class="nav-icon">📈</span>
+                        <span class="nav-text">Relatórios</span>
+                    </li>
+                </ul>
+                <div class="sidebar-footer">
+                    <span>👤 <span id="sidebar-usuario">Usuário</span></span>
+                </div>
+            </nav>
+
+            <!-- CONTEÚDO PRINCIPAL -->
+            <main class="main-content">
+
+                <!-- TAB: CHAT -->
+                <section id="tab-chat" class="tab-content active">
+                    <div class="chat-container">
+                        <div id="chat-mensagens" class="chat-mensagens"></div>
+                        <div class="chat-input-area">
+                            <input type="text" id="chat-input" placeholder="Pergunte qualquer coisa..." />
+                            <button id="btn-chat-enviar" class="btn-primary">📨 Enviar</button>
+                        </div>
+                        <div class="chat-sugestoes" id="chat-sugestoes">
+                            <span onclick="enviarPergunta('Me explique sobre células')">🧬 Células</span>
+                            <span onclick="enviarPergunta('O que é equação de 1º grau?')">📐 Equação 1º grau</span>
+                            <span onclick="enviarPergunta('Resumo sobre a Revolução Francesa')">🇫🇷 Revolução Francesa</span>
+                            <span onclick="enviarPergunta('Função dos ribossomos')">🧫 Ribossomos</span>
                         </div>
                     </div>
-                    <div style="flex:1; display:flex; gap:10px;">
-                        <button id="btn-iniciar" style="flex:1;">▶️ Iniciar</button>
-                        <button id="btn-finalizar" style="flex:1;" class="danger">⏹️ Finalizar</button>
+                </section>
+
+                <!-- TAB: ESTUDO -->
+                <section id="tab-estudo" class="tab-content">
+                    <h1>⏱️ Sessão de Estudo</h1>
+                    <p class="subtitle">Foque, estude e no final a IA gera flashcards e quiz.</p>
+                    <div class="card">
+                        <div class="flex-row">
+                            <div style="flex:1;">
+                                <label>📚 Matéria</label>
+                                <select id="materia-select">
+                                    <option>Matemática</option>
+                                    <option>Português</option>
+                                    <option>História</option>
+                                    <option>Física</option>
+                                    <option>Química</option>
+                                    <option>Biologia</option>
+                                    <option>Inglês</option>
+                                    <option>Redação</option>
+                                    <option>Programação</option>
+                                </select>
+                            </div>
+                            <div style="flex:1; display:flex; gap:10px;">
+                                <button id="btn-iniciar" class="btn-primary" style="flex:1;">▶️ Iniciar</button>
+                                <button id="btn-finalizar" class="btn-danger" style="flex:1;">⏹️ Finalizar</button>
+                            </div>
+                        </div>
+                        <div class="timer-display" id="timer">00:00</div>
+                        <div class="progress-bar"><div class="fill" id="timer-progress" style="width:0%;"></div></div>
                     </div>
-                </div>
-                <div class="timer-display" id="timer">00:00</div>
-                <div class="progress-bar"><div class="fill" id="timer-progress" style="width:0%;"></div></div>
-            </div>
+                    <div id="pos-estudo-area" style="display:none;" class="card">
+                        <h3>🧠 O que você estudou?</h3>
+                        <textarea id="descricao-estudo" placeholder="Descreva o conteúdo estudado..." style="margin-bottom:12px;"></textarea>
+                        <button id="btn-gerar-pos" class="btn-primary">📝 Gerar Flashcards e Quiz</button>
+                        <div id="resultado-pos" style="margin-top:20px;"></div>
+                    </div>
+                </section>
 
-            <div id="pos-estudo-area" style="display:none;" class="card">
-                <h3>🧠 O que você estudou?</h3>
-                <textarea id="descricao-estudo" placeholder="Descreva o conteúdo estudado..." style="margin-bottom:12px;"></textarea>
-                <button id="btn-gerar-pos">📝 Gerar Flashcards e Quiz</button>
-                <div id="resultado-pos" style="margin-top:20px;"></div>
-            </div>
-        </div>
+                <!-- TAB: FLASHCARDS -->
+                <section id="tab-flashcards" class="tab-content">
+                    <h1>🃏 Flashcards</h1>
+                    <p class="subtitle">Revisão espaçada – revise hoje!</p>
+                    <div id="flashcards-lista" class="card"></div>
+                </section>
 
-        <!-- TAB CHAT IA -->
-        <div id="tab-chat" class="tab-content">
-            <h1>💬 Converse com a IA</h1>
-            <p class="subtitle">Pergunte sobre qualquer assunto, peça resumos, explicações, etc.</p>
-            <div class="card">
-                <div id="chat-mensagens" style="max-height:400px; overflow-y:auto; margin-bottom:16px; background:#0E1117; border-radius:12px; padding:16px;"></div>
-                <div class="flex-row">
-                    <input type="text" id="chat-input" placeholder="Digite sua pergunta..." style="flex:1;">
-                    <button id="btn-chat-enviar">📨 Enviar</button>
-                </div>
-            </div>
-        </div>
+                <!-- TAB: REDAÇÃO -->
+                <section id="tab-redacao" class="tab-content">
+                    <h1>✍️ Corretor de Redação</h1>
+                    <p class="subtitle">Cole sua redação e receba correção estilo ENEM.</p>
+                    <div class="card">
+                        <textarea id="texto-redacao" style="min-height:200px;" placeholder="Digite ou cole sua redação aqui..."></textarea>
+                        <button id="btn-corrigir-redacao" class="btn-primary" style="margin-top:12px;">📝 Corrigir Redação</button>
+                        <div id="resultado-redacao" style="margin-top:20px; white-space:pre-wrap;"></div>
+                    </div>
+                </section>
 
-        <!-- TAB GRUPO -->
-        <div id="tab-grupo" class="tab-content">
-            <h1>🏆 Grupo de Estudos</h1>
-            <p class="subtitle">Ranking local (salvo no seu navegador).</p>
-            <div class="card">
-                <div class="flex-row">
-                    <input type="text" id="ranking-nome" placeholder="Seu nome" style="flex:1;" value="Você">
-                    <input type="number" id="ranking-minutos" placeholder="Minutos" style="flex:1;" value="30">
-                    <button id="btn-add-ranking">➕ Adicionar</button>
-                </div>
-                <div id="ranking-lista" style="margin-top:20px;"></div>
-            </div>
-        </div>
+                <!-- TAB: VESTIBULINHO -->
+                <section id="tab-vestibulinho" class="tab-content">
+                    <h1>📊 Vestibulinho</h1>
+                    <p class="subtitle">45 questões geradas por IA.</p>
+                    <button id="btn-gerar-vest" class="btn-primary" style="margin-bottom:20px;">🔄 Gerar Simulado</button>
+                    <div id="vestibulinho-container"></div>
+                </section>
 
-        <!-- TAB FLASHCARDS -->
-        <div id="tab-flashcards" class="tab-content">
-            <h1>🃏 Revisão Espaçada</h1>
-            <p class="subtitle">Flashcards que precisam de revisão hoje.</p>
-            <div id="flashcards-lista" class="card"></div>
-        </div>
+                <!-- TAB: GRUPO -->
+                <section id="tab-grupo" class="tab-content">
+                    <h1>👥 Grupo de Estudos</h1>
+                    <p class="subtitle">Estude com amigos, compartilhe progresso.</p>
 
-        <!-- TAB REDAÇÃO -->
-        <div id="tab-redacao" class="tab-content">
-            <h1>✍️ Corretor de Redação</h1>
-            <p class="subtitle">Cole sua redação e receba correção estilo ENEM.</p>
-            <div class="card">
-                <textarea id="texto-redacao" style="min-height:200px;" placeholder="Digite ou cole sua redação aqui..."></textarea>
-                <button id="btn-corrigir-redacao" style="margin-top:12px;">📝 Corrigir Redação</button>
-                <div id="resultado-redacao" style="margin-top:20px; white-space:pre-wrap;"></div>
-            </div>
-        </div>
+                    <!-- Criar Grupo -->
+                    <div class="card">
+                        <h3>➕ Criar Grupo</h3>
+                        <div class="flex-row">
+                            <input type="text" id="grupo-nome" placeholder="Nome do grupo" style="flex:2;">
+                            <input type="text" id="grupo-descricao" placeholder="Descrição (opcional)" style="flex:3;">
+                            <button id="btn-criar-grupo" class="btn-primary">Criar</button>
+                        </div>
+                    </div>
 
-        <!-- TAB VESTIBULINHO -->
-        <div id="tab-vestibulinho" class="tab-content">
-            <h1>📊 Simulado Semanal</h1>
-            <p class="subtitle"> Questões geradas por IA.</p>
-            <button id="btn-gerar-vest" style="margin-bottom:20px;">🔄 Gerar Simulado</button>
-            <div id="vestibulinho-container"></div>
-        </div>
+                    <!-- Entrar em Grupo -->
+                    <div class="card">
+                        <h3>🔑 Entrar em Grupo</h3>
+                        <div class="flex-row">
+                            <input type="text" id="grupo-convite" placeholder="Código de convite" style="flex:2;">
+                            <button id="btn-entrar-grupo" class="btn-secondary">Entrar</button>
+                        </div>
+                    </div>
 
-        <!-- TAB RELATÓRIOS -->
-        <div id="tab-relatorios" class="tab-content">
-            <h1>📈 Relatórios</h1>
-            <p class="subtitle">Seus dados salvos localmente.</p>
-            <div class="card">
-                <div class="metric-grid">
-                    <div class="metric"><div class="value" id="rel-total">0</div><div class="label">Minutos totais</div></div>
-                    <div class="metric"><div class="value" id="rel-sessoes">0</div><div class="label">Sessões</div></div>
-                    <div class="metric"><div class="value" id="rel-flashcards">0</div><div class="label">Flashcards</div></div>
-                </div>
-            </div>
+                    <!-- Meu Grupo Atual -->
+                    <div id="meu-grupo-info" class="card" style="display:none;">
+                        <h3 id="grupo-nome-exibido">📌 Nome do Grupo</h3>
+                        <p id="grupo-desc-exibido" style="color:#94A3B8;">Descrição</p>
+                        <p><strong>Código:</strong> <span id="grupo-codigo-exibido">XXXXXX</span></p>
+                        <button id="btn-sair-grupo" class="btn-danger" style="margin-top:8px;">🚪 Sair do Grupo</button>
+                        <hr style="border-color:#2D3448; margin:16px 0;">
+                        <h4>📊 Ranking do Grupo</h4>
+                        <div id="ranking-grupo-lista"></div>
+                        <hr style="border-color:#2D3448; margin:16px 0;">
+                        <h4>💬 Chat do Grupo</h4>
+                        <div id="chat-grupo-mensagens" style="max-height:200px; overflow-y:auto; background:#0B0E14; border-radius:12px; padding:12px; margin-bottom:8px;"></div>
+                        <div class="flex-row">
+                            <input type="text" id="chat-grupo-input" placeholder="Digite uma mensagem..." style="flex:2;">
+                            <button id="btn-chat-grupo-enviar" class="btn-primary">Enviar</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- TAB: AULAS -->
+                <section id="tab-aulas" class="tab-content">
+                    <h1>🎬 Aulas</h1>
+                    <p class="subtitle">Playlists do YouTube para estudar.</p>
+
+                    <!-- Adicionar aula (apenas admin) -->
+                    <div class="card" id="admin-aulas" style="display:none;">
+                        <h3>➕ Adicionar Aula</h3>
+                        <div class="flex-row">
+                            <input type="text" id="aula-categoria" placeholder="Categoria (ex: Matemática)" style="flex:1;">
+                            <input type="text" id="aula-titulo" placeholder="Título da playlist" style="flex:2;">
+                            <input type="url" id="aula-link" placeholder="URL do YouTube" style="flex:2;">
+                            <button id="btn-add-aula" class="btn-primary">Adicionar</button>
+                        </div>
+                    </div>
+
+                    <!-- Lista de aulas -->
+                    <div id="aulas-lista" class="card"></div>
+                </section>
+
+                <!-- TAB: RELATÓRIOS -->
+                <section id="tab-relatorios" class="tab-content">
+                    <h1>📈 Relatórios</h1>
+                    <p class="subtitle">Acompanhe sua evolução.</p>
+                    <div class="card">
+                        <div class="metric-grid">
+                            <div class="metric"><div class="value" id="rel-total">0</div><div class="label">Minutos totais</div></div>
+                            <div class="metric"><div class="value" id="rel-sessoes">0</div><div class="label">Sessões</div></div>
+                            <div class="metric"><div class="value" id="rel-flashcards">0</div><div class="label">Flashcards</div></div>
+                            <div class="metric"><div class="value" id="rel-racha">0</div><div class="label">Dias seguidos</div></div>
+                        </div>
+                    </div>
+                </section>
+
+            </main>
         </div>
     </div>
 
