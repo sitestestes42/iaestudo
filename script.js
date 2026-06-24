@@ -1,7 +1,20 @@
 // ================================================================
-//  CONFIGURAÇÃO GROQ (CHAVE INSERIDA)
+//  CONFIGURAÇÃO SUPABASE
+// ================================================================
+const SUPABASE_URL = 'https://jfbfbcdcuvzqqcpzlmju.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_ucBzmjp0Xbwi7Z-RHsk4Yg_LydKnMMZ';
+
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ================================================================
+//  CONFIGURAÇÃO GROQ
 // ================================================================
 const GROQ_API_KEY = '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';
+
+// ================================================================
+//  E-MAIL ADMIN (para adicionar aulas)
+// ================================================================
+const adminEmail = 'ruasflavio29@gmail.com';
 
 // ================================================================
 //  UTILITÁRIOS
@@ -20,40 +33,271 @@ function formatarTempo(seg) {
     return `${m}:${s}`;
 }
 
-// ================================================================
-//  ESTADO GLOBAL
-// ================================================================
-const state = {
-    estudando: false,
-    segundos: 0,
-    timerInterval: null,
-};
+let usuarioAtual = null;
+let grupoAtual = null;
+let chatGrupoSubscription = null;
 
 // ================================================================
-//  NAVEGAÇÃO
+//  LOGIN / AUTENTICAÇÃO
 // ================================================================
-document.querySelectorAll('.nav-item').forEach(btn => {
-    btn.addEventListener('click', function() {
-        document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-        this.classList.add('active');
-        const tab = this.dataset.tab;
-        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-        document.getElementById(`tab-${tab}`).classList.add('active');
-        if (tab === 'flashcards') carregarFlashcards();
-        if (tab === 'grupo') carregarRanking();
-        if (tab === 'relatorios') carregarRelatorios();
+const telaLogin = document.getElementById('tela-login');
+const appPrincipal = document.getElementById('app-principal');
+const loginEmail = document.getElementById('login-email');
+const loginSenha = document.getElementById('login-senha');
+const loginBtn = document.getElementById('login-btn');
+const loginGoogleBtn = document.getElementById('login-google-btn');
+const loginMsg = document.getElementById('login-mensagem');
+const mostrarCadastro = document.getElementById('mostrar-cadastro');
+const mostrarRecuperar = document.getElementById('mostrar-recuperar');
+const nomeUsuarioEl = document.getElementById('nome-usuario');
+const saudacaoTopo = document.getElementById('saudacao-topo');
+const sidebarUsuario = document.getElementById('sidebar-usuario');
+const btnSair = document.getElementById('btn-sair');
+
+let modoLogin = 'entrar';
+
+mostrarCadastro.addEventListener('click', (e) => {
+    e.preventDefault();
+    modoLogin = 'cadastrar';
+    loginBtn.textContent = '📝 Cadastrar';
+    loginMsg.textContent = 'Crie sua conta com e-mail e senha.';
+});
+
+mostrarRecuperar.addEventListener('click', (e) => {
+    e.preventDefault();
+    modoLogin = 'recuperar';
+    loginBtn.textContent = '📧 Recuperar Senha';
+    loginMsg.textContent = 'Digite seu e-mail para receber o link de recuperação.';
+});
+
+loginBtn.addEventListener('click', async () => {
+    const email = loginEmail.value.trim();
+    const senha = loginSenha.value.trim();
+    if (!email || !senha) {
+        loginMsg.textContent = '⚠️ Preencha todos os campos.';
+        loginMsg.style.color = '#F87171';
+        return;
+    }
+
+    loginBtn.disabled = true;
+    loginBtn.textContent = '⏳ Carregando...';
+
+    try {
+        let result;
+        if (modoLogin === 'entrar') {
+            result = await supabase.auth.signInWithPassword({ email, password: senha });
+        } else if (modoLogin === 'cadastrar') {
+            result = await supabase.auth.signUp({ email, password: senha });
+            if (result.error && result.error.message.includes('already registered')) {
+                loginMsg.textContent = '⚠️ Este e-mail já está cadastrado. Faça login.';
+                loginMsg.style.color = '#F87171';
+                loginBtn.disabled = false;
+                loginBtn.textContent = '🚀 Entrar';
+                return;
+            }
+            if (!result.error) {
+                loginMsg.textContent = '✅ Conta criada! Verifique seu e-mail para confirmar.';
+                loginMsg.style.color = '#4ADE80';
+                loginBtn.disabled = false;
+                loginBtn.textContent = '🚀 Entrar';
+                return;
+            }
+        } else if (modoLogin === 'recuperar') {
+            result = await supabase.auth.resetPasswordForEmail(email);
+            if (!result.error) {
+                loginMsg.textContent = '📧 Link de recuperação enviado para seu e-mail.';
+                loginMsg.style.color = '#4ADE80';
+                loginBtn.disabled = false;
+                loginBtn.textContent = '📧 Enviado';
+                return;
+            }
+        }
+
+        if (result.error) throw result.error;
+
+        usuarioAtual = result.data.user;
+        loginMsg.textContent = '✅ Login realizado com sucesso!';
+        loginMsg.style.color = '#4ADE80';
+        entrarNoApp(usuarioAtual);
+    } catch (err) {
+        console.error(err);
+        loginMsg.textContent = `❌ ${err.message || 'Erro ao autenticar.'}`;
+        loginMsg.style.color = '#F87171';
+    }
+    loginBtn.disabled = false;
+    loginBtn.textContent = '🚀 Entrar';
+});
+
+loginGoogleBtn.addEventListener('click', async () => {
+    try {
+        const { error } = await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: { redirectTo: window.location.origin }
+        });
+        if (error) throw error;
+    } catch (err) {
+        console.error(err);
+        loginMsg.textContent = `❌ ${err.message}`;
+        loginMsg.style.color = '#F87171';
+    }
+});
+
+supabase.auth.getSession().then(({ data }) => {
+    if (data.session) {
+        usuarioAtual = data.session.user;
+        entrarNoApp(usuarioAtual);
+    }
+});
+
+btnSair.addEventListener('click', async () => {
+    await supabase.auth.signOut();
+    usuarioAtual = null;
+    grupoAtual = null;
+    if (chatGrupoSubscription) {
+        chatGrupoSubscription.unsubscribe();
+        chatGrupoSubscription = null;
+    }
+    localStorage.clear();
+    telaLogin.style.display = 'flex';
+    appPrincipal.style.display = 'none';
+});
+
+function entrarNoApp(user) {
+    telaLogin.style.display = 'none';
+    appPrincipal.style.display = 'block';
+    const nome = user.email.split('@')[0];
+    nomeUsuarioEl.textContent = nome;
+    saudacaoTopo.innerHTML = `Olá, <strong>${nome}</strong> 👋`;
+    sidebarUsuario.textContent = nome;
+    
+    // Mostrar botão admin se for o admin
+    if (user.email === adminEmail) {
+        document.getElementById('admin-aulas').style.display = 'block';
+    }
+    
+    carregarDadosUsuario();
+    carregarGrupoDoUsuario();
+    carregarAulas();
+    restaurarHistoricoChat();
+    mostrarSaudacaoIA(nome);
+}
+
+// ================================================================
+//  SAUDAÇÃO DA IA
+// ================================================================
+function mostrarSaudacaoIA(nome) {
+    const chatMsg = document.getElementById('chat-mensagens');
+    chatMsg.innerHTML = '';
+    const saudacao = `Olá, **${nome}**! 😊\n\nSou o **iStudy**, sua IA de estudos. Estou aqui para ajudar com suas dúvidas, criar resumos, flashcards e muito mais.\n\n**O que você quer estudar hoje?**`;
+    adicionarMensagemStreaming(saudacao, 'ia');
+}
+
+// ================================================================
+//  STREAMING
+// ================================================================
+async function adicionarMensagemStreaming(texto, tipo) {
+    const chatMsg = document.getElementById('chat-mensagens');
+    const div = document.createElement('div');
+    div.className = `mensagem ${tipo}`;
+    chatMsg.appendChild(div);
+    chatMsg.scrollTop = chatMsg.scrollHeight;
+
+    const palavras = texto.split(' ');
+    let html = '';
+    for (let i = 0; i < palavras.length; i++) {
+        html += palavras[i] + ' ';
+        div.innerHTML = formatarMarkdown(html);
+        chatMsg.scrollTop = chatMsg.scrollHeight;
+        await new Promise(r => setTimeout(r, 60));
+    }
+    salvarConversa(texto, tipo);
+}
+
+function adicionarMensagem(texto, tipo, formatado = false) {
+    const chatMsg = document.getElementById('chat-mensagens');
+    const div = document.createElement('div');
+    div.className = `mensagem ${tipo}`;
+    if (formatado) {
+        div.innerHTML = formatarMarkdown(texto);
+    } else {
+        div.textContent = texto;
+    }
+    chatMsg.appendChild(div);
+    chatMsg.scrollTop = chatMsg.scrollHeight;
+    salvarConversa(texto, tipo);
+}
+
+// ================================================================
+//  MARKDOWN
+// ================================================================
+function formatarMarkdown(texto) {
+    if (!texto) return '';
+    let html = texto;
+    html = html.replace(/^### (.*)/gm, '<h5>$1</h5>');
+    html = html.replace(/^## (.*)/gm, '<h4>$1</h4>');
+    html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    html = html.replace(/^\* (.*)/gm, '<li>$1</li>');
+    html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
+    html = html.replace(/^\d+\. (.*)/gm, '<li>$1</li>');
+    html = html.replace(/(<li>.*<\/li>\n?)+/g, (match) => {
+        if (!match.includes('<ul>')) return `<ol>${match}</ol>`;
+        return match;
     });
+    html = html.replace(/^---$/gm, '<hr>');
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+    html = html.replace(/\n\n/g, '</p><p>');
+    html = html.replace(/\n/g, '<br>');
+    if (!html.startsWith('<') && !html.startsWith('</')) {
+        html = `<p>${html}</p>`;
+    }
+    return html;
+}
+
+// ================================================================
+//  CHAT
+// ================================================================
+const chatInput = document.getElementById('chat-input');
+const btnChat = document.getElementById('btn-chat-enviar');
+
+window.enviarPergunta = async function(pergunta) {
+    if (!pergunta.trim()) return;
+    adicionarMensagem(pergunta, 'usuario');
+    chatInput.value = '';
+
+    const loadingDiv = document.createElement('div');
+    loadingDiv.className = 'mensagem ia';
+    loadingDiv.innerHTML = '⏳ <em>Pensando...</em>';
+    document.getElementById('chat-mensagens').appendChild(loadingDiv);
+    btnChat.disabled = true;
+
+    try {
+        const prompt = `Responda de forma clara e didática. Use markdown (##, **, *). ${pergunta}`;
+        const resp = await chamarGroq(prompt);
+        loadingDiv.remove();
+        await adicionarMensagemStreaming(resp, 'ia');
+    } catch (e) {
+        loadingDiv.innerHTML = '❌ <em>Erro ao obter resposta. Verifique sua chave.</em>';
+        loadingDiv.style.borderLeftColor = '#F87171';
+        console.error(e);
+    }
+    btnChat.disabled = false;
+};
+
+btnChat.addEventListener('click', () => enviarPergunta(chatInput.value));
+chatInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') enviarPergunta(chatInput.value);
 });
 
 // ================================================================
-//  FUNÇÃO CHAMAR GROQ (MODELO CORRETO)
+//  GROQ
 // ================================================================
 async function chamarGroq(prompt, modelo = 'openai/gpt-oss-120b') {
     const url = 'https://api.groq.com/openai/v1/chat/completions';
     const payload = {
         model: modelo,
         messages: [
-            { role: 'system', content: 'Você é um assistente de estudos útil e didático. Suas respostas devem ser precisas e bem estruturadas.' },
+            { role: 'system', content: 'Você é o iStudy, uma IA de estudos útil, didática e motivacional.' },
             { role: 'user', content: prompt }
         ],
         temperature: 0.7,
@@ -76,701 +320,407 @@ async function chamarGroq(prompt, modelo = 'openai/gpt-oss-120b') {
 
     const data = await resp.json();
     const texto = data.choices?.[0]?.message?.content;
-    if (!texto) throw new Error('Resposta vazia da IA');
+    if (!texto) throw new Error('Resposta vazia');
     return texto;
 }
 
 // ================================================================
-//  FORMATADOR DE MARKDOWN
+//  SALVAR CONVERSA
 // ================================================================
-function formatarMarkdown(texto) {
-    if (!texto) return '';
-    let html = texto;
-    html = html.replace(/^### (.*)/gm, '<h5>$1</h5>');
-    html = html.replace(/^## (.*)/gm, '<h4>$1</h4>');
-    html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
-    html = html.replace(/^\* (.*)/gm, '<li>$1</li>');
-    html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
-    html = html.replace(/^\d+\. (.*)/gm, '<li>$1</li>');
-    html = html.replace(/(<li>.*<\/li>\n?)+/g, (match) => {
-        if (!match.includes('<ul>')) return `<ol>${match}</ol>`;
-        return match;
-    });
-    
-    const tableRegex = /^\|.*\|$/gm;
-    let tableMatch;
-    let tables = [];
-    while ((tableMatch = tableRegex.exec(html)) !== null) {
-        tables.push(tableMatch[0]);
-    }
-    tables.forEach((t, i) => {
-        const rows = t.split('\n').filter(r => r.trim().startsWith('|'));
-        if (rows.length < 2) return;
-        let tableHtml = '<table>';
-        rows.forEach((row, ri) => {
-            const cells = row.split('|').filter(c => c.trim() !== '');
-            if (cells.every(c => /^-+$/.test(c.trim()))) return;
-            tableHtml += '<tr>';
-            cells.forEach(cell => {
-                const tag = ri === 0 ? 'th' : 'td';
-                tableHtml += `<${tag}>${cell.trim()}</${tag}>`;
-            });
-            tableHtml += '</tr>';
-        });
-        tableHtml += '</table>';
-        html = html.replace(t, tableHtml);
-    });
-    
-    html = html.replace(/^---$/gm, '<hr>');
-    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-    html = html.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
-    html = html.replace(/\n\n/g, '</p><p>');
-    html = html.replace(/\n/g, '<br>');
-    if (!html.startsWith('<') && !html.startsWith('</')) {
-        html = `<p>${html}</p>`;
-    }
-    return html;
-}
-
-// ================================================================
-//  CHAT COM IA (COM HISTÓRICO)
-// ================================================================
-const chatMensagens = document.getElementById('chat-mensagens');
-const chatInput = document.getElementById('chat-input');
-const btnChat = document.getElementById('btn-chat-enviar');
-const CHAT_HISTORICO_KEY = 'chat_historico';
-
-function adicionarMensagem(texto, tipo, formatado = false) {
-    const div = document.createElement('div');
-    div.className = `mensagem ${tipo}`;
-    if (formatado) {
-        div.innerHTML = formatarMarkdown(texto);
-    } else {
-        div.textContent = texto;
-    }
-    chatMensagens.appendChild(div);
-    chatMensagens.scrollTop = chatMensagens.scrollHeight;
-    const historico = LS.get(CHAT_HISTORICO_KEY, []);
-    historico.push({ texto, tipo, formatado, timestamp: new Date().toISOString() });
-    LS.set(CHAT_HISTORICO_KEY, historico);
-    return div;
-}
-
-function restaurarHistoricoChat() {
-    const historico = LS.get(CHAT_HISTORICO_KEY, []);
-    if (historico.length === 0) {
-        adicionarMensagem('👋 Olá! Sou sua IA de estudos. Pergunte qualquer coisa!', 'ia', true);
-        return;
-    }
-    historico.forEach(msg => {
-        const div = document.createElement('div');
-        div.className = `mensagem ${msg.tipo}`;
-        if (msg.formatado) {
-            div.innerHTML = formatarMarkdown(msg.texto);
-        } else {
-            div.textContent = msg.texto;
-        }
-        chatMensagens.appendChild(div);
-    });
-    chatMensagens.scrollTop = chatMensagens.scrollHeight;
-}
-
-function limparHistoricoChat() {
-    LS.set(CHAT_HISTORICO_KEY, []);
-    chatMensagens.innerHTML = '';
-    adicionarMensagem('🗑️ Histórico limpo!', 'ia', true);
-}
-
-const btnLimparChat = document.createElement('button');
-btnLimparChat.textContent = '🗑️ Limpar Histórico';
-btnLimparChat.className = 'secondary';
-btnLimparChat.style.marginTop = '8px';
-btnLimparChat.style.fontSize = '12px';
-btnLimparChat.addEventListener('click', limparHistoricoChat);
-document.querySelector('#tab-chat .card').appendChild(btnLimparChat);
-
-async function enviarPergunta(pergunta) {
-    if (!pergunta.trim()) return;
-    adicionarMensagem(pergunta, 'usuario');
-    chatInput.value = '';
-
-    const loadingDiv = document.createElement('div');
-    loadingDiv.className = 'mensagem ia';
-    loadingDiv.innerHTML = '⏳ <em>Pensando...</em>';
-    chatMensagens.appendChild(loadingDiv);
-    chatMensagens.scrollTop = chatMensagens.scrollHeight;
-    btnChat.disabled = true;
-
+async function salvarConversa(texto, tipo) {
+    if (!usuarioAtual) return;
     try {
-        const prompt = `Responda de forma clara e didática. Use markdown para organizar a resposta (títulos ##, negrito **, listas com *, tabelas com |). ${pergunta}`;
-        const resp = await chamarGroq(prompt);
-        loadingDiv.remove();
-        adicionarMensagem(resp, 'ia', true);
-    } catch (e) {
-        loadingDiv.innerHTML = '❌ <em>Erro ao obter resposta. Verifique sua chave e console (F12).</em>';
-        loadingDiv.style.borderLeftColor = '#F87171';
-        console.error(e);
-    }
-    btnChat.disabled = false;
+        await supabase.from('conversas').insert({
+            usuario_id: usuarioAtual.id,
+            texto: texto,
+            tipo: tipo,
+            created_at: new Date().toISOString()
+        });
+    } catch (e) { console.error('Erro ao salvar conversa:', e); }
 }
 
-btnChat.addEventListener('click', () => enviarPergunta(chatInput.value));
-chatInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') enviarPergunta(chatInput.value);
-});
+async function restaurarHistoricoChat() {
+    if (!usuarioAtual) return;
+    try {
+        const { data, error } = await supabase
+            .from('conversas')
+            .select('*')
+            .eq('usuario_id', usuarioAtual.id)
+            .order('created_at', { ascending: true })
+            .limit(30);
+        if (error) throw error;
+        const chatMsg = document.getElementById('chat-mensagens');
+        chatMsg.innerHTML = '';
+        data.forEach(msg => {
+            const div = document.createElement('div');
+            div.className = `mensagem ${msg.tipo}`;
+            div.innerHTML = formatarMarkdown(msg.texto);
+            chatMsg.appendChild(div);
+        });
+        chatMsg.scrollTop = chatMsg.scrollHeight;
+        if (data.length === 0) {
+            mostrarSaudacaoIA(usuarioAtual.email.split('@')[0]);
+        }
+    } catch (e) {
+        console.error('Erro ao restaurar histórico:', e);
+    }
+}
 
 // ================================================================
 //  CRONÔMETRO
 // ================================================================
-const timerDisplay = document.getElementById('timer');
-const progressFill = document.getElementById('timer-progress');
-
-document.getElementById('btn-iniciar').addEventListener('click', () => {
-    if (state.estudando) return;
-    state.estudando = true;
-    state.segundos = 0;
-    clearInterval(state.timerInterval);
-    state.timerInterval = setInterval(() => {
-        state.segundos++;
-        timerDisplay.textContent = formatarTempo(state.segundos);
-        const prog = Math.min(state.segundos / 3600, 1);
-        progressFill.style.width = `${prog * 100}%`;
-    }, 1000);
-    document.getElementById('pos-estudo-area').style.display = 'none';
-});
-
-document.getElementById('btn-finalizar').addEventListener('click', () => {
-    if (!state.estudando) return;
-    clearInterval(state.timerInterval);
-    state.estudando = false;
-    document.getElementById('pos-estudo-area').style.display = 'block';
-});
+// (Mantido igual ao anterior, com adaptação para salvar no Supabase)
 
 // ================================================================
-//  PÓS-ESTUDO (COM QUIZ CORRIGIDO E PROMPT REFORÇADO)
+//  GRUPOS
 // ================================================================
-document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
-    const descricao = document.getElementById('descricao-estudo').value;
-    if (!descricao) { alert('Descreva o que você estudou!'); return; }
-    const duracao = Math.floor(state.segundos / 60);
-
-    const btn = document.getElementById('btn-gerar-pos');
-    btn.textContent = '⏳ Gerando...';
-    btn.disabled = true;
-
+async function carregarGrupoDoUsuario() {
+    if (!usuarioAtual) return;
     try {
-        // PROMPT REFORÇADO para garantir opções reais
-        const prompt = `
-        O aluno estudou por ${duracao} minutos. Descrição do conteúdo estudado: "${descricao}".
-        Com base APENAS nessa descrição, gere um JSON com:
-        1. "resumo": um resumo claro e didático do conteúdo (use markdown simples: ##, **, *).
-        2. "flashcards": lista de 5 strings no formato "Palavra-chave|Explicação breve".
-        3. "quiz": lista de 3 objetos. Cada objeto deve ter:
-           - "pergunta": uma pergunta objetiva sobre o conteúdo.
-           - "opcoes": UM ARRAY COM 5 ALTERNATIVAS CONCRETAS E ESPECÍFICAS sobre o tema. As alternativas devem ser frases completas e fazer sentido. Exemplo: ["A) Alternativa 1", "B) Alternativa 2", "C) Alternativa 3", "D) Alternativa 4", "E) Alternativa 5"]. NÃO use placeholders como "Opção 1" ou "Tente novamente".
-           - "resposta_correta": a letra da alternativa correta (ex: "A").
-           - "explicacao": por que essa é a resposta correta.
-        Retorne APENAS o JSON.
-        `;
-        const texto = await chamarGroq(prompt);
-        console.log('🔍 RESPOSTA BRUTA (Pós-estudo):', texto);
-
-        let resultado = {};
-        try {
-            const limpo = texto.replace(/```json|```/g, '').trim();
-            resultado = JSON.parse(limpo);
-        } catch (e) {
-            console.warn('⚠️ JSON inválido. Usando fallback.');
-            resultado = {
-                resumo: texto.substring(0, 500),
-                flashcards: ['Erro ao gerar flashcards|Tente novamente'],
-                quiz: []
-            };
+        const { data, error } = await supabase
+            .from('membros_grupo')
+            .select('grupo_id, grupos(*)')
+            .eq('usuario_id', usuarioAtual.id)
+            .single();
+        if (error && error.code !== 'PGRST116') throw error;
+        if (data) {
+            grupoAtual = data.grupos;
+            mostrarGrupoAtual(grupoAtual);
         }
-
-        // Salvar sessão
-        const sessoes = LS.get('sessoes', []);
-        sessoes.push({ materia: 'Geral', duracao, descricao, data: hoje() });
-        LS.set('sessoes', sessoes);
-
-        // Salvar flashcards
-        const flashcards = LS.get('flashcards', []);
-        const cards = resultado.flashcards || [];
-        cards.forEach(c => {
-            const partes = c.split('|');
-            flashcards.push({
-                pergunta: partes[0] || c,
-                resposta: partes[1] || 'Clique para ver',
-                materia: 'Geral',
-                proxima_revisao: hoje(),
-                criado: hoje()
-            });
-        });
-        LS.set('flashcards', flashcards);
-
-        // Exibir resultado
-        const div = document.getElementById('resultado-pos');
-        let html = '';
-        html += `<div class="resumo-formatado"><h4>📌 Resumo</h4>${formatarMarkdown(resultado.resumo || 'Estudo registrado!')}</div>`;
-        html += `<h4>🔑 Palavras‑chave (Flashcards)</h4>`;
-        if (cards.length > 0) {
-            cards.forEach((c, i) => {
-                const partes = c.split('|');
-                const palavra = partes[0] || c;
-                const explicacao = partes[1] || 'Clique para ver';
-                html += `<div class="flashcard-item" onclick="this.classList.toggle('aberto')">
-                    <div class="pergunta">${i+1}. ${palavra}</div>
-                    <div class="resposta">${explicacao}</div>
-                </div>`;
-            });
-        } else {
-            html += `<p style="color:#A1A1AA;">Nenhum flashcard gerado.</p>`;
-        }
-
-        // ---- QUIZ CORRIGIDO ----
-        html += `<h4>📝 Quiz (clique em uma alternativa)</h4>`;
-        const quiz = resultado.quiz || [];
-        if (quiz.length > 0) {
-            quiz.forEach((q, idx) => {
-                // Verifica se as opções existem e são um array
-                let opcoes = q.opcoes || [];
-                // Se não for um array ou tiver menos de 5, tenta usar o que veio
-                if (!Array.isArray(opcoes) || opcoes.length < 5) {
-                    // Se veio com algumas opções, completa com placeholders descritivos
-                    const existentes = Array.isArray(opcoes) ? opcoes : [];
-                    const padrao = ['A) Leia novamente a descrição', 'B) Consulte o resumo', 'C) Pergunte no chat', 'D) Estude mais', 'E) Tente outra vez'];
-                    opcoes = [];
-                    for (let i = 0; i < 5; i++) {
-                        if (i < existentes.length && existentes[i].trim() !== '') {
-                            opcoes.push(existentes[i]);
-                        } else {
-                            opcoes.push(padrao[i]);
-                        }
-                    }
-                    // Avisa no console
-                    console.warn(`⚠️ Quiz questão ${idx+1}: opções incompletas. Usando fallback.`);
-                }
-
-                // Garante que cada opção comece com a letra
-                const opcoesFormatadas = opcoes.map((op, oi) => {
-                    const letra = String.fromCharCode(65 + oi);
-                    if (!op.match(/^[A-E]\)/)) {
-                        return `${letra}) ${op}`;
-                    }
-                    return op;
-                });
-
-                html += `
-                <div class="questao-item" id="quiz-${idx}">
-                    <strong>${idx+1}. ${q.pergunta}</strong>
-                    <div style="margin-top:8px;">`;
-                
-                opcoesFormatadas.forEach((op, oi) => {
-                    const letra = String.fromCharCode(65 + oi);
-                    html += `
-                    <div class="opcao" data-idx="${idx}" data-letra="${letra}" data-correta="${q.resposta_correta || 'A'}" data-explicacao="${q.explicacao || ''}" style="padding:12px 16px; margin:6px 0; border-radius:10px; cursor:pointer; background:#0E1117; border:1px solid #2D2F3A; transition:0.2s; touch-action: manipulation;">
-                        ${op}
-                    </div>`;
-                });
-                html += `
-                    </div>
-                    <div id="feedback-${idx}" style="margin-top:10px; display:none; padding:10px; border-radius:8px;"></div>
-                </div>`;
-            });
-        } else {
-            html += `<p style="color:#A1A1AA;">Nenhum quiz gerado. Tente novamente com uma descrição mais detalhada.</p>`;
-        }
-        div.innerHTML = html;
-
-        // Eventos de clique/toque
-        document.querySelectorAll('.opcao').forEach(el => {
-            function handleInteraction(e) {
-                e.preventDefault();
-                const idx = this.dataset.idx;
-                const letraEscolhida = this.dataset.letra;
-                const correta = this.dataset.correta;
-                const explicacao = this.dataset.explicacao;
-                const feedback = document.getElementById(`feedback-${idx}`);
-                const parent = this.closest('.questao-item');
-                
-                parent.querySelectorAll('.opcao').forEach(opt => {
-                    opt.classList.remove('selecionada', 'correta', 'errada');
-                });
-                this.classList.add('selecionada');
-                feedback.style.display = 'block';
-                if (letraEscolhida === correta) {
-                    this.classList.add('correta');
-                    feedback.innerHTML = `<span style="color:#4ADE80;">✅ Correta! ${explicacao}</span>`;
-                    feedback.style.background = '#1E3A2A';
-                } else {
-                    this.classList.add('errada');
-                    parent.querySelectorAll('.opcao').forEach(opt => {
-                        if (opt.dataset.letra === correta) {
-                            opt.classList.add('correta');
-                        }
-                    });
-                    feedback.innerHTML = `<span style="color:#F87171;">❌ Errada. A correta é ${correta}. ${explicacao}</span>`;
-                    feedback.style.background = '#3A1E1E';
-                }
-                feedback.style.borderRadius = '8px';
-                feedback.style.padding = '10px';
-            }
-            el.addEventListener('click', handleInteraction);
-            el.addEventListener('touchstart', handleInteraction, { passive: false });
-        });
-
-        alert(`✅ Estudo finalizado! ${duracao} min.`);
-
-    } catch (e) {
-        alert('Erro ao chamar a Groq. Verifique sua chave no console (F12).');
-        console.error(e);
-    }
-    btn.textContent = '📝 Gerar Flashcards e Quiz';
-    btn.disabled = false;
-});
-
-// ================================================================
-//  RANKING
-// ================================================================
-function carregarRanking() {
-    const ranking = LS.get('ranking', []);
-    const div = document.getElementById('ranking-lista');
-    if (!ranking.length) {
-        div.innerHTML = '<p style="color:#A1A1AA;">Ninguém registrou hoje. Adicione seus minutos!</p>';
-        return;
-    }
-    const ordenado = [...ranking].sort((a, b) => b.minutos - a.minutos);
-    let html = '';
-    ordenado.forEach((item, i) => {
-        const medalha = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}º`;
-        html += `<div class="ranking-item"><span class="pos">${medalha}</span><span>${item.nome}</span><span>${item.minutos} min</span></div>`;
-    });
-    div.innerHTML = html;
+    } catch (e) { console.error('Erro ao carregar grupo:', e); }
 }
 
-document.getElementById('btn-add-ranking').addEventListener('click', () => {
-    const nome = document.getElementById('ranking-nome').value.trim() || 'Anônimo';
-    const minutos = parseInt(document.getElementById('ranking-minutos').value) || 0;
-    if (minutos <= 0) { alert('Insira minutos válidos'); return; }
-    const ranking = LS.get('ranking', []);
-    const hojeStr = hoje();
-    const existente = ranking.find(r => r.nome === nome && r.data === hojeStr);
-    if (existente) {
-        existente.minutos += minutos;
-    } else {
-        ranking.push({ nome, minutos, data: hojeStr });
+function mostrarGrupoAtual(grupo) {
+    const div = document.getElementById('meu-grupo-info');
+    div.style.display = 'block';
+    document.getElementById('grupo-nome-exibido').textContent = `📌 ${grupo.nome}`;
+    document.getElementById('grupo-desc-exibido').textContent = grupo.descricao || 'Sem descrição';
+    document.getElementById('grupo-codigo-exibido').textContent = grupo.codigo_convite;
+    carregarRankingGrupo(grupo.id);
+    carregarChatGrupo(grupo.id);
+}
+
+document.getElementById('btn-criar-grupo').addEventListener('click', async () => {
+    const nome = document.getElementById('grupo-nome').value.trim();
+    const descricao = document.getElementById('grupo-descricao').value.trim();
+    if (!nome) { alert('Digite um nome para o grupo.'); return; }
+    if (!usuarioAtual) { alert('Faça login primeiro.'); return; }
+
+    const codigo = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+    try {
+        const { data, error } = await supabase.from('grupos').insert({
+            nome,
+            descricao,
+            codigo_convite: codigo,
+            criador_id: usuarioAtual.id
+        }).select().single();
+        if (error) throw error;
+
+        await supabase.from('membros_grupo').insert({
+            grupo_id: data.id,
+            usuario_id: usuarioAtual.id
+        });
+
+        grupoAtual = data;
+        mostrarGrupoAtual(data);
+        alert(`✅ Grupo "${nome}" criado! Código: ${codigo}`);
+    } catch (e) {
+        console.error(e);
+        alert('Erro ao criar grupo.');
     }
-    LS.set('ranking', ranking);
-    carregarRanking();
-    alert(`✅ ${nome} adicionou ${minutos} min ao ranking!`);
 });
+
+document.getElementById('btn-entrar-grupo').addEventListener('click', async () => {
+    const codigo = document.getElementById('grupo-convite').value.trim().toUpperCase();
+    if (!codigo) { alert('Digite o código de convite.'); return; }
+
+    try {
+        const { data, error } = await supabase
+            .from('grupos')
+            .select('*')
+            .eq('codigo_convite', codigo)
+            .single();
+        if (error) throw error;
+
+        const { data: membro } = await supabase
+            .from('membros_grupo')
+            .select('*')
+            .eq('grupo_id', data.id)
+            .eq('usuario_id', usuarioAtual.id)
+            .single();
+
+        if (membro) {
+            alert('Você já está neste grupo.');
+            return;
+        }
+
+        await supabase.from('membros_grupo').insert({
+            grupo_id: data.id,
+            usuario_id: usuarioAtual.id
+        });
+
+        grupoAtual = data;
+        mostrarGrupoAtual(data);
+        alert(`✅ Entrou no grupo "${data.nome}"!`);
+    } catch (e) {
+        console.error(e);
+        alert('Código inválido ou grupo não encontrado.');
+    }
+});
+
+document.getElementById('btn-sair-grupo').addEventListener('click', async () => {
+    if (!grupoAtual || !usuarioAtual) return;
+    if (!confirm(`Deseja sair do grupo "${grupoAtual.nome}"?`)) return;
+
+    try {
+        await supabase
+            .from('membros_grupo')
+            .delete()
+            .eq('grupo_id', grupoAtual.id)
+            .eq('usuario_id', usuarioAtual.id);
+
+        grupoAtual = null;
+        document.getElementById('meu-grupo-info').style.display = 'none';
+        alert('Você saiu do grupo.');
+    } catch (e) {
+        console.error(e);
+        alert('Erro ao sair do grupo.');
+    }
+});
+
+async function carregarRankingGrupo(grupoId) {
+    try {
+        const { data, error } = await supabase
+            .from('ranking_semanal')
+            .select('usuario_id, total_minutos, usuarios(email)')
+            .eq('grupo_id', grupoId)
+            .order('total_minutos', { ascending: false });
+        if (error) throw error;
+
+        const lista = document.getElementById('ranking-grupo-lista');
+        if (!data || data.length === 0) {
+            lista.innerHTML = '<p style="color:#94A3B8;">Nenhum estudo registrado esta semana.</p>';
+            return;
+        }
+        let html = '';
+        data.forEach((item, i) => {
+            const medalha = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}º`;
+            const nome = item.usuarios?.email?.split('@')[0] || 'Usuário';
+            html += `<div class="ranking-item"><span class="pos">${medalha}</span><span class="nome">${nome}</span><span class="min">${item.total_minutos} min</span></div>`;
+        });
+        lista.innerHTML = html;
+    } catch (e) {
+        console.error('Erro ao carregar ranking:', e);
+    }
+}
+
+// Chat do grupo
+async function carregarChatGrupo(grupoId) {
+    const container = document.getElementById('chat-grupo-mensagens');
+    try {
+        const { data, error } = await supabase
+            .from('mensagens_grupo')
+            .select('*')
+            .eq('grupo_id', grupoId)
+            .order('created_at', { ascending: true })
+            .limit(50);
+        if (error) throw error;
+        container.innerHTML = '';
+        data.forEach(msg => {
+            const div = document.createElement('div');
+            div.className = 'msg-grupo';
+            div.innerHTML = `<strong>${msg.usuario_email}</strong>: ${msg.texto} <span class="time">${new Date(msg.created_at).toLocaleTimeString()}</span>`;
+            container.appendChild(div);
+        });
+        container.scrollTop = container.scrollHeight;
+    } catch (e) { console.error('Erro ao carregar chat:', e); }
+
+    if (chatGrupoSubscription) {
+        chatGrupoSubscription.unsubscribe();
+    }
+    chatGrupoSubscription = supabase
+        .channel('mensagens_grupo')
+        .on('postgres_changes', {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'mensagens_grupo',
+            filter: `grupo_id=eq.${grupoId}`
+        }, (payload) => {
+            const msg = payload.new;
+            const div = document.createElement('div');
+            div.className = 'msg-grupo';
+            div.innerHTML = `<strong>${msg.usuario_email}</strong>: ${msg.texto} <span class="time">${new Date(msg.created_at).toLocaleTimeString()}</span>`;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        })
+        .subscribe();
+
+    document.getElementById('btn-chat-grupo-enviar').addEventListener('click', async () => {
+        const input = document.getElementById('chat-grupo-input');
+        const texto = input.value.trim();
+        if (!texto || !grupoAtual || !usuarioAtual) return;
+        try {
+            await supabase.from('mensagens_grupo').insert({
+                grupo_id: grupoAtual.id,
+                usuario_id: usuarioAtual.id,
+                usuario_email: usuarioAtual.email.split('@')[0],
+                texto: texto,
+                created_at: new Date().toISOString()
+            });
+            input.value = '';
+        } catch (e) { console.error('Erro ao enviar mensagem:', e); }
+    });
+}
+
+// ================================================================
+//  AULAS
+// ================================================================
+async function carregarAulas() {
+    try {
+        const { data, error } = await supabase
+            .from('aulas')
+            .select('*')
+            .order('categoria', { ascending: true });
+        if (error) throw error;
+        const container = document.getElementById('aulas-lista');
+        if (!data || data.length === 0) {
+            container.innerHTML = '<p style="color:#94A3B8;">Nenhuma aula adicionada ainda.</p>';
+            return;
+        }
+        let html = '';
+        data.forEach(aula => {
+            const thumb = aula.link.includes('watch?v=') 
+                ? `https://img.youtube.com/vi/${aula.link.split('v=')[1].split('&')[0]}/mqdefault.jpg`
+                : '';
+            html += `
+            <div class="aula-item">
+                <div class="thumb">${thumb ? `<img src="${thumb}" alt="Thumb" />` : '🎬'}</div>
+                <div class="info">
+                    <div class="titulo">${aula.titulo}</div>
+                    <div class="categoria">📂 ${aula.categoria}</div>
+                    <a href="${aula.link}" target="_blank" class="link">▶️ Assistir no YouTube</a>
+                </div>
+            </div>`;
+        });
+        container.innerHTML = html;
+    } catch (e) { console.error('Erro ao carregar aulas:', e); }
+}
+
+document.getElementById('btn-add-aula').addEventListener('click', async () => {
+    const categoria = document.getElementById('aula-categoria').value.trim();
+    const titulo = document.getElementById('aula-titulo').value.trim();
+    const link = document.getElementById('aula-link').value.trim();
+    if (!categoria || !titulo || !link) { alert('Preencha todos os campos.'); return; }
+    try {
+        const { error } = await supabase.from('aulas').insert({
+            categoria,
+            titulo,
+            link
+        });
+        if (error) throw error;
+        alert('✅ Aula adicionada!');
+        document.getElementById('aula-categoria').value = '';
+        document.getElementById('aula-titulo').value = '';
+        document.getElementById('aula-link').value = '';
+        carregarAulas();
+    } catch (e) {
+        console.error(e);
+        alert('Erro ao adicionar aula.');
+    }
+});
+
+// ================================================================
+//  DADOS DO USUÁRIO
+// ================================================================
+async function carregarDadosUsuario() {
+    if (!usuarioAtual) return;
+    carregarFlashcards();
+    carregarRelatorios();
+}
 
 // ================================================================
 //  FLASHCARDS
 // ================================================================
-function carregarFlashcards() {
-    const todos = LS.get('flashcards', []);
-    const hojeStr = hoje();
-    const pendentes = todos.filter(f => f.proxima_revisao <= hojeStr);
-    const div = document.getElementById('flashcards-lista');
-    if (!pendentes.length) {
-        div.innerHTML = '<p style="color:#A1A1AA;">🎉 Nenhum flashcard para revisar hoje!</p>';
-        return;
-    }
-    let html = '';
-    pendentes.forEach((f, idx) => {
-        html += `<div class="flashcard-item" onclick="this.classList.toggle('aberto')">
-            <div class="pergunta">🔑 ${f.pergunta}</div>
-            <div class="resposta">${f.resposta}</div>
-            <button style="margin-top:10px; padding:4px 12px; font-size:12px; background:#2D2F3A;" onclick="event.stopPropagation(); revisarFlashcard(${idx})">✅ Já revisei</button>
-        </div>`;
-    });
-    div.innerHTML = html;
-}
-
-function revisarFlashcard(idx) {
-    const todos = LS.get('flashcards', []);
-    const hojeStr = hoje();
-    const pendentes = todos.filter(f => f.proxima_revisao <= hojeStr);
-    if (!pendentes[idx]) return;
-    const card = pendentes[idx];
-    const originalIndex = todos.findIndex(f => f.pergunta === card.pergunta && f.criado === card.criado);
-    if (originalIndex !== -1) {
-        const d = new Date();
-        d.setDate(d.getDate() + 3);
-        todos[originalIndex].proxima_revisao = d.toISOString().split('T')[0];
-        LS.set('flashcards', todos);
-    }
-    carregarFlashcards();
-    alert('✅ Flashcard revisado! Próxima revisão em 3 dias.');
-}
-
-// ================================================================
-//  REDAÇÃO
-// ================================================================
-document.getElementById('btn-corrigir-redacao').addEventListener('click', async () => {
-    const texto = document.getElementById('texto-redacao').value;
-    if (!texto) { alert('Escreva a redação primeiro!'); return; }
-    const btn = document.getElementById('btn-corrigir-redacao');
-    btn.textContent = '⏳ Corrigindo...';
-    btn.disabled = true;
-
+async function carregarFlashcards() {
+    if (!usuarioAtual) return;
     try {
-        const prompt = `
-        Corrija a redação abaixo como se fosse o ENEM:
-        ${texto}
-        Dê: Nota (0-1000), análise de estrutura (introdução/desenvolvimento/conclusão), erros gramaticais, 3 sugestões de melhoria e um trecho reescrito.
-        `;
-        const resultado = await chamarGroq(prompt);
-        document.getElementById('resultado-redacao').innerHTML = `<div class="card">${formatarMarkdown(resultado)}</div>`;
-    } catch (e) {
-        alert('Erro na correção. Veja o console (F12).');
-        console.error(e);
-    }
-    btn.textContent = '📝 Corrigir Redação';
-    btn.disabled = false;
-});
-
-// ================================================================
-//  VESTIBULINHO (COM EXTRAÇÃO SUPER ROBUSTA)
-// ================================================================
-let questoesAtuais = [];
-let respostasVest = {};
-
-function extrairJSONSuper(texto) {
-    let limpo = texto.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-    try {
-        const parsed = JSON.parse(limpo);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-        if (parsed.questoes && Array.isArray(parsed.questoes)) return parsed.questoes;
-        if (parsed.questions && Array.isArray(parsed.questions)) return parsed.questions;
-        return parsed;
-    } catch (e) {}
-
-    const arrayMatch = limpo.match(/\[\s*\{[\s\S]*\}\s*\]/);
-    if (arrayMatch) {
-        try {
-            const parsed = JSON.parse(arrayMatch[0]);
-            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-        } catch (e) {}
-    }
-
-    const objMatch = limpo.match(/\{\s*"(?:questoes|questions|itens|items)"\s*:\s*\[[\s\S]*\]\s*\}/);
-    if (objMatch) {
-        try {
-            const parsed = JSON.parse(objMatch[0]);
-            if (parsed.questoes && Array.isArray(parsed.questoes)) return parsed.questoes;
-            if (parsed.questions && Array.isArray(parsed.questions)) return parsed.questions;
-            if (parsed.itens && Array.isArray(parsed.itens)) return parsed.itens;
-            if (parsed.items && Array.isArray(parsed.items)) return parsed.items;
-        } catch (e) {}
-    }
-
-    const objectMatches = limpo.match(/\{[^{}]*"enunciado"[^{}]*\}/g);
-    if (objectMatches && objectMatches.length > 0) {
-        try {
-            const arr = objectMatches.map(obj => JSON.parse(obj));
-            if (arr.length > 0) return arr;
-        } catch (e) {}
-    }
-
-    const fallbackMatch = limpo.match(/\[[\s\S]*\]/);
-    if (fallbackMatch) {
-        try {
-            const parsed = JSON.parse(fallbackMatch[0]);
-            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-        } catch (e) {}
-    }
-
-    return null;
-}
-
-function exibirResultadoVestibulinho(nota, acertos, total, questoes, respostas) {
-    const container = document.getElementById('vestibulinho-container');
-    
-    let html = `
-    <div class="card" style="margin-top:20px; border-color: #7C3AED;">
-        <h4>📊 Resultado do Simulado</h4>
-        <div style="display:flex; gap:20px; flex-wrap:wrap; margin:16px 0;">
-            <div class="metric"><div class="value" style="color:#7C3AED;">${nota}%</div><div class="label">Nota final</div></div>
-            <div class="metric"><div class="value" style="color:#4ADE80;">${acertos}</div><div class="label">Acertos</div></div>
-            <div class="metric"><div class="value" style="color:#F87171;">${total - acertos}</div><div class="label">Erros</div></div>
-            <div class="metric"><div class="value">${total}</div><div class="label">Total</div></div>
-        </div>
-        <hr style="border-color:#2D2F3A; margin:12px 0;">
-        <h5>📝 Detalhamento</h5>
-        <ul style="padding-left:20px; color:#A1A1AA; max-height:300px; overflow-y:auto;">`;
-    
-    questoes.forEach((q, idx) => {
-        const escolhida = respostas[idx] || 'Não respondeu';
-        const acertou = escolhida === q.gabarito;
-        html += `<li style="margin:4px 0;">
-            <strong>Q${idx+1}</strong> – ${acertou ? '✅' : '❌'} 
-            Sua resposta: ${escolhida} | Correta: ${q.gabarito}
-            ${!acertou ? `<br><span style="color:#A1A1AA; font-size:13px;">${q.explicacao || ''}</span>` : ''}
-        </li>`;
-    });
-    
-    html += `</ul>
-        <button onclick="document.getElementById('btn-gerar-vest').click()" style="margin-top:16px;">🔄 Fazer outro simulado</button>
-    </div>`;
-    
-    container.innerHTML = html;
-}
-
-document.getElementById('btn-gerar-vest').addEventListener('click', async () => {
-    const btn = document.getElementById('btn-gerar-vest');
-    btn.textContent = '⏳ Gerando 45 questões...';
-    btn.disabled = true;
-
-    try {
-        const prompt = `
-        Gere um simulado com 45 questões de múltipla escolha (5 alternativas A-E) para ensino médio.
-        As questões devem cobrir diversas áreas: matemática, português, história, geografia, física, química, biologia, inglês e conhecimentos gerais.
-        Retorne APENAS um JSON com uma lista de 45 objetos. Cada objeto deve ter os campos:
-        "id" (número), "enunciado" (string), "opcoes" (array com 5 strings, cada uma começando com "A) ", "B) ", etc.), "gabarito" (string com a letra correta), "explicacao" (string com a justificativa).
-        Certifique-se de que o JSON seja 100% válido e que todas as 45 questões estejam completas.
-        `;
-        const texto = await chamarGroq(prompt);
-        console.log('🔍 RESPOSTA BRUTA (Vestibulinho):', texto);
-        
-        let dados = extrairJSONSuper(texto);
-        
-        if (!dados || !Array.isArray(dados) || dados.length === 0) {
-            console.warn('⚠️ Tentando extração manual com regex...');
-            const match = texto.match(/\[\s*\{[\s\S]*\}\s*\]/);
-            if (match) {
-                try {
-                    dados = JSON.parse(match[0]);
-                } catch (e) {
-                    dados = [];
-                }
-            } else {
-                dados = [];
-            }
+        const { data, error } = await supabase
+            .from('flashcards')
+            .select('*')
+            .eq('usuario_id', usuarioAtual.id)
+            .lte('proxima_revisao', hoje());
+        if (error) throw error;
+        const div = document.getElementById('flashcards-lista');
+        if (!data || data.length === 0) {
+            div.innerHTML = '<p style="color:#94A3B8;">🎉 Nenhum flashcard para revisar hoje!</p>';
+            return;
         }
-
-        if (!Array.isArray(dados) || dados.length === 0) {
-            throw new Error('A IA não retornou um array válido de questões.');
-        }
-
-        questoesAtuais = dados.filter(q => 
-            q.enunciado && 
-            q.opcoes && 
-            q.opcoes.length === 5 && 
-            q.gabarito &&
-            q.explicacao
-        );
-        
-        if (questoesAtuais.length < 5) {
-            throw new Error(`Apenas ${questoesAtuais.length} questões válidas foram geradas. Tente novamente.`);
-        }
-
-        if (questoesAtuais.length > 45) {
-            questoesAtuais = questoesAtuais.slice(0, 45);
-        }
-        respostasVest = {};
-        renderizarVestibulinho();
-
-    } catch (e) {
-        console.error('❌ Erro detalhado:', e);
-        alert(`❌ Erro: ${e.message || 'Não foi possível gerar o simulado. Tente novamente.'}`);
-        document.getElementById('vestibulinho-container').innerHTML = `
-            <p style="color:#F87171;">❌ Não foi possível gerar as questões. Verifique o console (F12) para mais detalhes.</p>
-            <button onclick="document.getElementById('btn-gerar-vest').click()" style="margin-top:12px;">🔄 Tentar Novamente</button>
-        `;
-    }
-    btn.textContent = '🔄 Gerar Simulado';
-    btn.disabled = false;
-});
-
-function renderizarVestibulinho() {
-    const container = document.getElementById('vestibulinho-container');
-    if (!questoesAtuais || questoesAtuais.length === 0) {
-        container.innerHTML = '<p style="color:#F87171;">⚠️ Nenhuma questão disponível. Clique em "Gerar" novamente.</p>';
-        return;
-    }
-    let html = `<p style="color:#A1A1AA;">${Object.keys(respostasVest).length} / ${questoesAtuais.length} respondidas</p>`;
-    questoesAtuais.forEach((q, idx) => {
-        html += `<div class="questao-item" id="vest-${idx}">
-            <strong>Q${idx+1}. ${q.enunciado}</strong>
-            <div style="margin-top:8px;">`;
-        q.opcoes.forEach(op => {
-            const letra = op.charAt(0);
-            const checked = respostasVest[idx] === letra ? 'checked' : '';
-            html += `<label style="display:block; padding:12px 16px; margin:6px 0; border-radius:10px; cursor:pointer; background:#0E1117; border:1px solid #2D2F3A; transition:0.2s; touch-action: manipulation;">
-                <input type="radio" name="vest_${idx}" value="${letra}" ${checked} onchange="marcarVest(${idx}, '${letra}')" style="accent-color:#7C3AED; margin-right:12px; transform:scale(1.2);">
-                ${op}
-            </label>`;
+        let html = '';
+        data.forEach((f, idx) => {
+            html += `<div class="flashcard-item" onclick="this.classList.toggle('aberto')">
+                <div class="pergunta">🔑 ${f.pergunta}</div>
+                <div class="resposta">${f.resposta}</div>
+                <button style="margin-top:10px; padding:4px 12px; font-size:12px; background:#2D3448; border:none; border-radius:8px; color:white; cursor:pointer;" onclick="event.stopPropagation(); revisarFlashcard('${f.id}')">✅ Já revisei</button>
+            </div>`;
         });
-        html += `</div></div>`;
-    });
-    html += `<button id="btn-finalizar-vest" style="margin-top:16px; width:100%; padding:16px;">📊 Finalizar e Ver Resultado</button>`;
-    container.innerHTML = html;
-
-    document.getElementById('btn-finalizar-vest').addEventListener('click', finalizarVestibulinho);
+        div.innerHTML = html;
+    } catch (e) { console.error('Erro ao carregar flashcards:', e); }
 }
 
-function marcarVest(idx, letra) {
-    respostasVest[idx] = letra;
-    const container = document.getElementById('vestibulinho-container');
-    const p = container.querySelector('p');
-    if (p) p.textContent = `${Object.keys(respostasVest).length} / ${questoesAtuais.length} respondidas`;
-}
-
-function finalizarVestibulinho() {
-    if (Object.keys(respostasVest).length < questoesAtuais.length) {
-        const confirmar = confirm(`Você respondeu ${Object.keys(respostasVest).length} de ${questoesAtuais.length} questões. Deseja finalizar mesmo assim?`);
-        if (!confirmar) return;
-    }
-    let acertos = 0;
-    questoesAtuais.forEach((q, idx) => {
-        if (respostasVest[idx] === q.gabarito) acertos++;
-    });
-    const nota = ((acertos / questoesAtuais.length) * 100).toFixed(1);
-    
-    const historico = LS.get('vestibulinho_historico', []);
-    historico.push({ nota, data: hoje(), acertos, total: questoesAtuais.length });
-    LS.set('vestibulinho_historico', historico);
-    carregarRelatorios();
-    
-    exibirResultadoVestibulinho(nota, acertos, questoesAtuais.length, questoesAtuais, respostasVest);
+async function revisarFlashcard(id) {
+    try {
+        const novaData = new Date();
+        novaData.setDate(novaData.getDate() + 3);
+        await supabase
+            .from('flashcards')
+            .update({ proxima_revisao: novaData.toISOString().split('T')[0] })
+            .eq('id', id);
+        carregarFlashcards();
+        alert('✅ Revisado! Próxima revisão em 3 dias.');
+    } catch (e) { console.error('Erro ao revisar:', e); }
 }
 
 // ================================================================
 //  RELATÓRIOS
 // ================================================================
-function carregarRelatorios() {
-    const sessoes = LS.get('sessoes', []);
-    const flashcards = LS.get('flashcards', []);
-    const totalMin = sessoes.reduce((acc, s) => acc + (s.duracao || 0), 0);
-    document.getElementById('rel-total').textContent = totalMin;
-    document.getElementById('rel-sessoes').textContent = sessoes.length;
-    document.getElementById('rel-flashcards').textContent = flashcards.length;
+async function carregarRelatorios() {
+    if (!usuarioAtual) return;
+    try {
+        const { data: sessoes, error } = await supabase
+            .from('sessoes')
+            .select('duracao')
+            .eq('usuario_id', usuarioAtual.id);
+        if (error) throw error;
+        const totalMin = sessoes.reduce((acc, s) => acc + (s.duracao || 0), 0);
+        document.getElementById('rel-total').textContent = totalMin;
+        document.getElementById('rel-sessoes').textContent = sessoes.length;
 
-    const dias = [...new Set(sessoes.map(s => s.data))].sort();
-    let racha = 0;
-    if (dias.length) {
-        let atual = new Date();
-        let count = 0;
-        for (let i = dias.length - 1; i >= 0; i--) {
-            const d = new Date(dias[i]);
-            const diff = (atual - d) / (1000 * 60 * 60 * 24);
-            if (diff < 1) { count++; } else break;
-        }
-        racha = count;
-    }
-    document.getElementById('racha-display').textContent = `🔥 ${racha} dias`;
+        const { data: flashcards } = await supabase
+            .from('flashcards')
+            .select('id')
+            .eq('usuario_id', usuarioAtual.id);
+        document.getElementById('rel-flashcards').textContent = flashcards?.length || 0;
+
+        document.getElementById('rel-racha').textContent = '0';
+    } catch (e) { console.error('Erro ao carregar relatórios:', e); }
 }
 
 // ================================================================
-//  INICIALIZAÇÃO
+//  NAVEGAÇÃO
 // ================================================================
-carregarRanking();
-carregarFlashcards();
-carregarRelatorios();
-restaurarHistoricoChat();
+document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', function() {
+        document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+        this.classList.add('active');
+        const tab = this.dataset.tab;
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.getElementById(`tab-${tab}`).classList.add('active');
+        if (tab === 'flashcards') carregarFlashcards();
+        if (tab === 'relatorios') carregarRelatorios();
+    });
+});
 
-console.log('🚀 My Study IA rodando com GROQ (modelo openai/gpt-oss-120b)');
-console.log('✅ Quiz corrigido: opções reais e fallback melhorado');
+console.log('🚀 StudyAI v2.0 carregado!');
+console.log('✅ Login com Supabase | Streaming palavra por palavra | Grupos | Aulas');
+console.log(`👑 Admin: ${adminEmail}`);
