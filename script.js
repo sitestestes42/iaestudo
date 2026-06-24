@@ -46,14 +46,14 @@ document.querySelectorAll('.nav-item').forEach(btn => {
 });
 
 // ================================================================
-//  FUNÇÃO CHAMAR GROQ (MODELO CORRETO: openai/gpt-oss-120b)
+//  FUNÇÃO CHAMAR GROQ (MODELO CORRETO)
 // ================================================================
 async function chamarGroq(prompt, modelo = 'openai/gpt-oss-120b') {
     const url = 'https://api.groq.com/openai/v1/chat/completions';
     const payload = {
         model: modelo,
         messages: [
-            { role: 'system', content: 'Você é um assistente de estudos útil e didático.' },
+            { role: 'system', content: 'Você é um assistente de estudos útil e didático. Suas respostas devem ser precisas e bem estruturadas.' },
             { role: 'user', content: prompt }
         ],
         temperature: 0.7,
@@ -81,12 +81,11 @@ async function chamarGroq(prompt, modelo = 'openai/gpt-oss-120b') {
 }
 
 // ================================================================
-//  FORMATADOR DE MARKDOWN PARA HTML
+//  FORMATADOR DE MARKDOWN
 // ================================================================
 function formatarMarkdown(texto) {
     if (!texto) return '';
     let html = texto;
-    
     html = html.replace(/^### (.*)/gm, '<h5>$1</h5>');
     html = html.replace(/^## (.*)/gm, '<h4>$1</h4>');
     html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
@@ -128,7 +127,6 @@ function formatarMarkdown(texto) {
     html = html.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
     html = html.replace(/\n\n/g, '</p><p>');
     html = html.replace(/\n/g, '<br>');
-    
     if (!html.startsWith('<') && !html.startsWith('</')) {
         html = `<p>${html}</p>`;
     }
@@ -141,7 +139,6 @@ function formatarMarkdown(texto) {
 const chatMensagens = document.getElementById('chat-mensagens');
 const chatInput = document.getElementById('chat-input');
 const btnChat = document.getElementById('btn-chat-enviar');
-
 const CHAT_HISTORICO_KEY = 'chat_historico';
 
 function adicionarMensagem(texto, tipo, formatado = false) {
@@ -154,7 +151,6 @@ function adicionarMensagem(texto, tipo, formatado = false) {
     }
     chatMensagens.appendChild(div);
     chatMensagens.scrollTop = chatMensagens.scrollHeight;
-    
     const historico = LS.get(CHAT_HISTORICO_KEY, []);
     historico.push({ texto, tipo, formatado, timestamp: new Date().toISOString() });
     LS.set(CHAT_HISTORICO_KEY, historico);
@@ -252,7 +248,7 @@ document.getElementById('btn-finalizar').addEventListener('click', () => {
 });
 
 // ================================================================
-//  PÓS-ESTUDO (COM QUIZ CORRIGIDO PARA MOBILE)
+//  PÓS-ESTUDO (COM QUIZ CORRIGIDO E PROMPT REFORÇADO)
 // ================================================================
 document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
     const descricao = document.getElementById('descricao-estudo').value;
@@ -264,12 +260,17 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
     btn.disabled = true;
 
     try {
+        // PROMPT REFORÇADO para garantir opções reais
         const prompt = `
         O aluno estudou por ${duracao} minutos. Descrição do conteúdo estudado: "${descricao}".
         Com base APENAS nessa descrição, gere um JSON com:
         1. "resumo": um resumo claro e didático do conteúdo (use markdown simples: ##, **, *).
         2. "flashcards": lista de 5 strings no formato "Palavra-chave|Explicação breve".
-        3. "quiz": lista de 3 objetos com "pergunta", "opcoes" (5 alternativas A-E), "resposta_correta" e "explicacao".
+        3. "quiz": lista de 3 objetos. Cada objeto deve ter:
+           - "pergunta": uma pergunta objetiva sobre o conteúdo.
+           - "opcoes": UM ARRAY COM 5 ALTERNATIVAS CONCRETAS E ESPECÍFICAS sobre o tema. As alternativas devem ser frases completas e fazer sentido. Exemplo: ["A) Alternativa 1", "B) Alternativa 2", "C) Alternativa 3", "D) Alternativa 4", "E) Alternativa 5"]. NÃO use placeholders como "Opção 1" ou "Tente novamente".
+           - "resposta_correta": a letra da alternativa correta (ex: "A").
+           - "explicacao": por que essa é a resposta correta.
         Retorne APENAS o JSON.
         `;
         const texto = await chamarGroq(prompt);
@@ -284,19 +285,16 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
             resultado = {
                 resumo: texto.substring(0, 500),
                 flashcards: ['Erro ao gerar flashcards|Tente novamente'],
-                quiz: [{ 
-                    pergunta: 'Não foi possível gerar quiz.', 
-                    opcoes: ['A) Tente novamente', 'B) Verifique a descrição', 'C) Estude mais', 'D) Use o chat', 'E) OK'], 
-                    resposta_correta: 'A', 
-                    explicacao: 'Verifique o console para mais detalhes.' 
-                }]
+                quiz: []
             };
         }
 
+        // Salvar sessão
         const sessoes = LS.get('sessoes', []);
         sessoes.push({ materia: 'Geral', duracao, descricao, data: hoje() });
         LS.set('sessoes', sessoes);
 
+        // Salvar flashcards
         const flashcards = LS.get('flashcards', []);
         const cards = resultado.flashcards || [];
         cards.forEach(c => {
@@ -311,6 +309,7 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
         });
         LS.set('flashcards', flashcards);
 
+        // Exibir resultado
         const div = document.getElementById('resultado-pos');
         let html = '';
         html += `<div class="resumo-formatado"><h4>📌 Resumo</h4>${formatarMarkdown(resultado.resumo || 'Estudo registrado!')}</div>`;
@@ -329,49 +328,62 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
             html += `<p style="color:#A1A1AA;">Nenhum flashcard gerado.</p>`;
         }
 
+        // ---- QUIZ CORRIGIDO ----
         html += `<h4>📝 Quiz (clique em uma alternativa)</h4>`;
         const quiz = resultado.quiz || [];
         if (quiz.length > 0) {
             quiz.forEach((q, idx) => {
+                // Verifica se as opções existem e são um array
+                let opcoes = q.opcoes || [];
+                // Se não for um array ou tiver menos de 5, tenta usar o que veio
+                if (!Array.isArray(opcoes) || opcoes.length < 5) {
+                    // Se veio com algumas opções, completa com placeholders descritivos
+                    const existentes = Array.isArray(opcoes) ? opcoes : [];
+                    const padrao = ['A) Leia novamente a descrição', 'B) Consulte o resumo', 'C) Pergunte no chat', 'D) Estude mais', 'E) Tente outra vez'];
+                    opcoes = [];
+                    for (let i = 0; i < 5; i++) {
+                        if (i < existentes.length && existentes[i].trim() !== '') {
+                            opcoes.push(existentes[i]);
+                        } else {
+                            opcoes.push(padrao[i]);
+                        }
+                    }
+                    // Avisa no console
+                    console.warn(`⚠️ Quiz questão ${idx+1}: opções incompletas. Usando fallback.`);
+                }
+
+                // Garante que cada opção comece com a letra
+                const opcoesFormatadas = opcoes.map((op, oi) => {
+                    const letra = String.fromCharCode(65 + oi);
+                    if (!op.match(/^[A-E]\)/)) {
+                        return `${letra}) ${op}`;
+                    }
+                    return op;
+                });
+
                 html += `
                 <div class="questao-item" id="quiz-${idx}">
                     <strong>${idx+1}. ${q.pergunta}</strong>
                     <div style="margin-top:8px;">`;
-                if (q.opcoes && q.opcoes.length === 5) {
-                    q.opcoes.forEach((op, oi) => {
-                        const letra = String.fromCharCode(65 + oi);
-                        // Verifica se a opção começa com a letra, senão adiciona
-                        let opcaoFormatada = op;
-                        if (!op.match(/^[A-E]\)/)) {
-                            opcaoFormatada = `${letra}) ${op}`;
-                        }
-                        html += `
-                        <div class="opcao" data-idx="${idx}" data-letra="${letra}" data-correta="${q.resposta_correta}" data-explicacao="${q.explicacao || ''}" style="padding:12px 16px; margin:6px 0; border-radius:10px; cursor:pointer; background:#0E1117; border:1px solid #2D2F3A; transition:0.2s; touch-action: manipulation;">
-                            ${opcaoFormatada}
-                        </div>`;
-                    });
-                } else {
-                    // Fallback com opções padrão
-                    const opcoesPadrao = ['A) Tente novamente', 'B) Verifique a descrição', 'C) Estude mais', 'D) Use o chat', 'E) OK'];
-                    opcoesPadrao.forEach((op, oi) => {
-                        const letra = String.fromCharCode(65 + oi);
-                        html += `
-                        <div class="opcao" data-idx="${idx}" data-letra="${letra}" data-correta="A" data-explicacao="Opção padrão" style="padding:12px 16px; margin:6px 0; border-radius:10px; cursor:pointer; background:#0E1117; border:1px solid #2D2F3A; transition:0.2s; touch-action: manipulation;">
-                            ${op}
-                        </div>`;
-                    });
-                }
+                
+                opcoesFormatadas.forEach((op, oi) => {
+                    const letra = String.fromCharCode(65 + oi);
+                    html += `
+                    <div class="opcao" data-idx="${idx}" data-letra="${letra}" data-correta="${q.resposta_correta || 'A'}" data-explicacao="${q.explicacao || ''}" style="padding:12px 16px; margin:6px 0; border-radius:10px; cursor:pointer; background:#0E1117; border:1px solid #2D2F3A; transition:0.2s; touch-action: manipulation;">
+                        ${op}
+                    </div>`;
+                });
                 html += `
                     </div>
                     <div id="feedback-${idx}" style="margin-top:10px; display:none; padding:10px; border-radius:8px;"></div>
                 </div>`;
             });
         } else {
-            html += `<p style="color:#A1A1AA;">Nenhum quiz gerado.</p>`;
+            html += `<p style="color:#A1A1AA;">Nenhum quiz gerado. Tente novamente com uma descrição mais detalhada.</p>`;
         }
         div.innerHTML = html;
 
-        // Adicionar eventos de clique e toque
+        // Eventos de clique/toque
         document.querySelectorAll('.opcao').forEach(el => {
             function handleInteraction(e) {
                 e.preventDefault();
@@ -404,7 +416,6 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
                 feedback.style.borderRadius = '8px';
                 feedback.style.padding = '10px';
             }
-            // Suporte para mouse e toque
             el.addEventListener('click', handleInteraction);
             el.addEventListener('touchstart', handleInteraction, { passive: false });
         });
@@ -762,4 +773,4 @@ carregarRelatorios();
 restaurarHistoricoChat();
 
 console.log('🚀 My Study IA rodando com GROQ (modelo openai/gpt-oss-120b)');
-console.log('✅ Corrigido para mobile: quiz com opções clicáveis e fallback melhorado');
+console.log('✅ Quiz corrigido: opções reais e fallback melhorado');
