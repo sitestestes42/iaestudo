@@ -12,7 +12,7 @@ const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const GROQ_API_KEY = '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';
 
 // ================================================================
-//  E-MAIL ADMIN (para adicionar aulas)
+//  E-MAIL ADMIN
 // ================================================================
 const adminEmail = 'ruasflavio29@gmail.com';
 
@@ -49,7 +49,6 @@ const loginGoogleBtn = document.getElementById('login-google-btn');
 const loginMsg = document.getElementById('login-mensagem');
 const mostrarCadastro = document.getElementById('mostrar-cadastro');
 const mostrarRecuperar = document.getElementById('mostrar-recuperar');
-const nomeUsuarioEl = document.getElementById('nome-usuario');
 const saudacaoTopo = document.getElementById('saudacao-topo');
 const sidebarUsuario = document.getElementById('sidebar-usuario');
 const btnSair = document.getElementById('btn-sair');
@@ -166,11 +165,9 @@ function entrarNoApp(user) {
     telaLogin.style.display = 'none';
     appPrincipal.style.display = 'block';
     const nome = user.email.split('@')[0];
-    nomeUsuarioEl.textContent = nome;
     saudacaoTopo.innerHTML = `Olá, <strong>${nome}</strong> 👋`;
     sidebarUsuario.textContent = nome;
     
-    // Mostrar botão admin se for o admin
     if (user.email === adminEmail) {
         document.getElementById('admin-aulas').style.display = 'block';
     }
@@ -369,7 +366,7 @@ async function restaurarHistoricoChat() {
 // ================================================================
 //  CRONÔMETRO
 // ================================================================
-// (Mantido igual ao anterior, com adaptação para salvar no Supabase)
+// (implementar depois, mas você pode usar o código anterior adaptado)
 
 // ================================================================
 //  GRUPOS
