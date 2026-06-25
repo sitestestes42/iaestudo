@@ -9,7 +9,7 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_
 // ================================================================
 //  CONFIGURAÇÃO GROQ
 // ================================================================
-const GROQ_API_KEY = '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'; // COLOQUE SUA NOVA CHAVE AQUI
+const GROQ_API_KEY = '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'; // COLOQUE SUA NOVA CHAVE AQUI
 
 // ================================================================
 //  E-MAIL ADMIN
