@@ -4,7 +4,8 @@
 const SUPABASE_URL = 'https://jfbfbcdcuvzqqcpzlmju.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_ucBzmjp0Xbwi7Z-RHsk4Yg_LydKnMMZ';
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Usando window.supabase para evitar conflitos
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ================================================================
 //  CONFIGURAÇÃO GROQ
@@ -84,9 +85,9 @@ loginBtn.addEventListener('click', async () => {
     try {
         let result;
         if (modoLogin === 'entrar') {
-            result = await supabase.auth.signInWithPassword({ email, password: senha });
+            result = await supabaseClient.auth.signInWithPassword({ email, password: senha });
         } else if (modoLogin === 'cadastrar') {
-            result = await supabase.auth.signUp({ email, password: senha });
+            result = await supabaseClient.auth.signUp({ email, password: senha });
             if (result.error && result.error.message.includes('already registered')) {
                 loginMsg.textContent = '⚠️ Este e-mail já está cadastrado. Faça login.';
                 loginMsg.style.color = '#F87171';
@@ -102,7 +103,7 @@ loginBtn.addEventListener('click', async () => {
                 return;
             }
         } else if (modoLogin === 'recuperar') {
-            result = await supabase.auth.resetPasswordForEmail(email);
+            result = await supabaseClient.auth.resetPasswordForEmail(email);
             if (!result.error) {
                 loginMsg.textContent = '📧 Link de recuperação enviado para seu e-mail.';
                 loginMsg.style.color = '#4ADE80';
@@ -129,7 +130,7 @@ loginBtn.addEventListener('click', async () => {
 
 loginGoogleBtn.addEventListener('click', async () => {
     try {
-        const { error } = await supabase.auth.signInWithOAuth({
+        const { error } = await supabaseClient.auth.signInWithOAuth({
             provider: 'google',
             options: { redirectTo: window.location.origin }
         });
@@ -141,7 +142,7 @@ loginGoogleBtn.addEventListener('click', async () => {
     }
 });
 
-supabase.auth.getSession().then(({ data }) => {
+supabaseClient.auth.getSession().then(({ data }) => {
     if (data.session) {
         usuarioAtual = data.session.user;
         entrarNoApp(usuarioAtual);
@@ -149,7 +150,7 @@ supabase.auth.getSession().then(({ data }) => {
 });
 
 btnSair.addEventListener('click', async () => {
-    await supabase.auth.signOut();
+    await supabaseClient.auth.signOut();
     usuarioAtual = null;
     grupoAtual = null;
     if (chatGrupoSubscription) {
@@ -327,7 +328,7 @@ async function chamarGroq(prompt, modelo = 'openai/gpt-oss-120b') {
 async function salvarConversa(texto, tipo) {
     if (!usuarioAtual) return;
     try {
-        await supabase.from('conversas').insert({
+        await supabaseClient.from('conversas').insert({
             usuario_id: usuarioAtual.id,
             texto: texto,
             tipo: tipo,
@@ -339,7 +340,7 @@ async function salvarConversa(texto, tipo) {
 async function restaurarHistoricoChat() {
     if (!usuarioAtual) return;
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('conversas')
             .select('*')
             .eq('usuario_id', usuarioAtual.id)
@@ -364,17 +365,12 @@ async function restaurarHistoricoChat() {
 }
 
 // ================================================================
-//  CRONÔMETRO
-// ================================================================
-// (implementar depois, mas você pode usar o código anterior adaptado)
-
-// ================================================================
 //  GRUPOS
 // ================================================================
 async function carregarGrupoDoUsuario() {
     if (!usuarioAtual) return;
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('membros_grupo')
             .select('grupo_id, grupos(*)')
             .eq('usuario_id', usuarioAtual.id)
@@ -406,7 +402,7 @@ document.getElementById('btn-criar-grupo').addEventListener('click', async () =>
     const codigo = Math.random().toString(36).substring(2, 8).toUpperCase();
 
     try {
-        const { data, error } = await supabase.from('grupos').insert({
+        const { data, error } = await supabaseClient.from('grupos').insert({
             nome,
             descricao,
             codigo_convite: codigo,
@@ -414,7 +410,7 @@ document.getElementById('btn-criar-grupo').addEventListener('click', async () =>
         }).select().single();
         if (error) throw error;
 
-        await supabase.from('membros_grupo').insert({
+        await supabaseClient.from('membros_grupo').insert({
             grupo_id: data.id,
             usuario_id: usuarioAtual.id
         });
@@ -433,14 +429,14 @@ document.getElementById('btn-entrar-grupo').addEventListener('click', async () =
     if (!codigo) { alert('Digite o código de convite.'); return; }
 
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('grupos')
             .select('*')
             .eq('codigo_convite', codigo)
             .single();
         if (error) throw error;
 
-        const { data: membro } = await supabase
+        const { data: membro } = await supabaseClient
             .from('membros_grupo')
             .select('*')
             .eq('grupo_id', data.id)
@@ -452,7 +448,7 @@ document.getElementById('btn-entrar-grupo').addEventListener('click', async () =
             return;
         }
 
-        await supabase.from('membros_grupo').insert({
+        await supabaseClient.from('membros_grupo').insert({
             grupo_id: data.id,
             usuario_id: usuarioAtual.id
         });
@@ -471,7 +467,7 @@ document.getElementById('btn-sair-grupo').addEventListener('click', async () => 
     if (!confirm(`Deseja sair do grupo "${grupoAtual.nome}"?`)) return;
 
     try {
-        await supabase
+        await supabaseClient
             .from('membros_grupo')
             .delete()
             .eq('grupo_id', grupoAtual.id)
@@ -488,7 +484,7 @@ document.getElementById('btn-sair-grupo').addEventListener('click', async () => 
 
 async function carregarRankingGrupo(grupoId) {
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('ranking_semanal')
             .select('usuario_id, total_minutos, usuarios(email)')
             .eq('grupo_id', grupoId)
@@ -516,7 +512,7 @@ async function carregarRankingGrupo(grupoId) {
 async function carregarChatGrupo(grupoId) {
     const container = document.getElementById('chat-grupo-mensagens');
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('mensagens_grupo')
             .select('*')
             .eq('grupo_id', grupoId)
@@ -536,7 +532,7 @@ async function carregarChatGrupo(grupoId) {
     if (chatGrupoSubscription) {
         chatGrupoSubscription.unsubscribe();
     }
-    chatGrupoSubscription = supabase
+    chatGrupoSubscription = supabaseClient
         .channel('mensagens_grupo')
         .on('postgres_changes', {
             event: 'INSERT',
@@ -558,7 +554,7 @@ async function carregarChatGrupo(grupoId) {
         const texto = input.value.trim();
         if (!texto || !grupoAtual || !usuarioAtual) return;
         try {
-            await supabase.from('mensagens_grupo').insert({
+            await supabaseClient.from('mensagens_grupo').insert({
                 grupo_id: grupoAtual.id,
                 usuario_id: usuarioAtual.id,
                 usuario_email: usuarioAtual.email.split('@')[0],
@@ -575,7 +571,7 @@ async function carregarChatGrupo(grupoId) {
 // ================================================================
 async function carregarAulas() {
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('aulas')
             .select('*')
             .order('categoria', { ascending: true });
@@ -610,7 +606,7 @@ document.getElementById('btn-add-aula').addEventListener('click', async () => {
     const link = document.getElementById('aula-link').value.trim();
     if (!categoria || !titulo || !link) { alert('Preencha todos os campos.'); return; }
     try {
-        const { error } = await supabase.from('aulas').insert({
+        const { error } = await supabaseClient.from('aulas').insert({
             categoria,
             titulo,
             link
@@ -642,7 +638,7 @@ async function carregarDadosUsuario() {
 async function carregarFlashcards() {
     if (!usuarioAtual) return;
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('flashcards')
             .select('*')
             .eq('usuario_id', usuarioAtual.id)
@@ -669,7 +665,7 @@ async function revisarFlashcard(id) {
     try {
         const novaData = new Date();
         novaData.setDate(novaData.getDate() + 3);
-        await supabase
+        await supabaseClient
             .from('flashcards')
             .update({ proxima_revisao: novaData.toISOString().split('T')[0] })
             .eq('id', id);
@@ -684,7 +680,7 @@ async function revisarFlashcard(id) {
 async function carregarRelatorios() {
     if (!usuarioAtual) return;
     try {
-        const { data: sessoes, error } = await supabase
+        const { data: sessoes, error } = await supabaseClient
             .from('sessoes')
             .select('duracao')
             .eq('usuario_id', usuarioAtual.id);
@@ -693,7 +689,7 @@ async function carregarRelatorios() {
         document.getElementById('rel-total').textContent = totalMin;
         document.getElementById('rel-sessoes').textContent = sessoes.length;
 
-        const { data: flashcards } = await supabase
+        const { data: flashcards } = await supabaseClient
             .from('flashcards')
             .select('id')
             .eq('usuario_id', usuarioAtual.id);
