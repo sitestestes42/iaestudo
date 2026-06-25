@@ -18,7 +18,6 @@
             <div class="login-logo">📚</div>
             <h1>Study<span>AI</span></h1>
             <p class="login-subtitle">Sua IA pessoal para estudos</p>
-
             <div class="login-card">
                 <input type="email" id="login-email" placeholder="Seu e-mail" />
                 <input type="password" id="login-senha" placeholder="Sua senha" />
@@ -31,10 +30,7 @@
                 </div>
                 <p class="login-hint" id="login-mensagem"></p>
             </div>
-
-            <div class="login-footer">
-                <span>✨ Gratuito • StudyAI v2.0</span>
-            </div>
+            <div class="login-footer"><span>✨ Gratuito • StudyAI v2.0</span></div>
         </div>
     </div>
 
@@ -46,68 +42,61 @@
         <!-- TOP BAR -->
         <header class="top-bar">
             <div class="top-bar-left">
+                <button id="btn-menu-toggle" class="btn-menu">☰</button>
                 <div class="logo-small">📚 Study<span>AI</span></div>
             </div>
             <div class="top-bar-center">
                 <span class="user-greeting" id="saudacao-topo">Olá, <strong>Usuário</strong> 👋</span>
             </div>
             <div class="top-bar-right">
+                <button id="btn-nova-conversa" class="btn-new-chat">➕ Nova</button>
                 <button id="btn-sair" class="btn-sair">🚪 Sair</button>
             </div>
         </header>
 
-        <!-- SIDEBAR + CONTEÚDO -->
+        <!-- CORPO PRINCIPAL -->
         <div class="app-body">
 
-            <!-- SIDEBAR -->
-            <nav class="sidebar" id="sidebar">
-                <ul>
-                    <li class="nav-item active" data-tab="chat">
-                        <span class="nav-icon">💬</span>
-                        <span class="nav-text">Chat</span>
-                    </li>
-                    <li class="nav-item" data-tab="estudo">
-                        <span class="nav-icon">⏱️</span>
-                        <span class="nav-text">Estudo</span>
-                    </li>
-                    <li class="nav-item" data-tab="flashcards">
-                        <span class="nav-icon">🃏</span>
-                        <span class="nav-text">Flashcards</span>
-                    </li>
-                    <li class="nav-item" data-tab="redacao">
-                        <span class="nav-icon">✍️</span>
-                        <span class="nav-text">Redação</span>
-                    </li>
-                    <li class="nav-item" data-tab="vestibulinho">
-                        <span class="nav-icon">📊</span>
-                        <span class="nav-text">Vestibulinho</span>
-                    </li>
-                    <li class="nav-item" data-tab="grupo">
-                        <span class="nav-icon">👥</span>
-                        <span class="nav-text">Grupo</span>
-                    </li>
-                    <li class="nav-item" data-tab="aulas">
-                        <span class="nav-icon">🎬</span>
-                        <span class="nav-text">Aulas</span>
-                    </li>
-                    <li class="nav-item" data-tab="relatorios">
-                        <span class="nav-icon">📈</span>
-                        <span class="nav-text">Relatórios</span>
-                    </li>
-                </ul>
-                <div class="sidebar-footer">
-                    <span>👤 <span id="sidebar-usuario">Usuário</span></span>
+            <!-- DRAWER LATERAL (MENU) -->
+            <aside id="drawer" class="drawer">
+                <div class="drawer-header">
+                    <h3>📚 StudyAI</h3>
+                    <button id="btn-close-drawer" class="btn-close-drawer">✕</button>
                 </div>
-            </nav>
+                <div class="drawer-conversas">
+                    <h4>💬 Conversas</h4>
+                    <div id="lista-conversas"></div>
+                    <button id="btn-nova-conversa-drawer" class="btn-new-conversa">➕ Nova conversa</button>
+                </div>
+                <hr />
+                <div class="drawer-ferramentas">
+                    <h4>🛠️ Ferramentas</h4>
+                    <button class="drawer-item" data-tab="chat">💬 Chat</button>
+                    <button class="drawer-item" data-tab="estudo">⏱️ Estudo</button>
+                    <button class="drawer-item" data-tab="flashcards">🃏 Flashcards</button>
+                    <button class="drawer-item" data-tab="redacao">✍️ Redação</button>
+                    <button class="drawer-item" data-tab="vestibulinho">📊 Vestibulinho</button>
+                    <button class="drawer-item" data-tab="grupo">👥 Grupo</button>
+                    <button class="drawer-item" data-tab="aulas">🎬 Aulas</button>
+                    <button class="drawer-item" data-tab="relatorios">📈 Relatórios</button>
+                </div>
+                <div class="drawer-footer">
+                    <span>👤 <span id="drawer-usuario">Usuário</span></span>
+                </div>
+            </aside>
+
+            <!-- OVERLAY PARA FECHAR DRAWER -->
+            <div id="drawer-overlay" class="drawer-overlay"></div>
 
             <!-- CONTEÚDO PRINCIPAL -->
             <main class="main-content">
 
-                <!-- TAB: CHAT -->
+                <!-- =================== -->
+                <!-- TAB: CHAT (TELA CHEIA) -->
+                <!-- =================== -->
                 <section id="tab-chat" class="tab-content active">
                     <div class="chat-container">
                         <div id="chat-mensagens" class="chat-mensagens"></div>
-                        <!-- NOVA CAIXA DE INPUT MODERNA -->
                         <div class="chat-input-area">
                             <input type="text" id="chat-input" placeholder="Pergunte qualquer coisa..." />
                             <button id="btn-chat-enviar">📨</button>
@@ -121,30 +110,16 @@
                     </div>
                 </section>
 
+                <!-- =================== -->
                 <!-- TAB: ESTUDO -->
+                <!-- =================== -->
                 <section id="tab-estudo" class="tab-content">
                     <h1>⏱️ Sessão de Estudo</h1>
                     <p class="subtitle">Foque, estude e no final a IA gera flashcards e quiz.</p>
                     <div class="card">
-                        <div class="flex-row">
-                            <div style="flex:1;">
-                                <label>📚 Matéria</label>
-                                <select id="materia-select">
-                                    <option>Matemática</option>
-                                    <option>Português</option>
-                                    <option>História</option>
-                                    <option>Física</option>
-                                    <option>Química</option>
-                                    <option>Biologia</option>
-                                    <option>Inglês</option>
-                                    <option>Redação</option>
-                                    <option>Programação</option>
-                                </select>
-                            </div>
-                            <div style="flex:1; display:flex; gap:10px;">
-                                <button id="btn-iniciar" class="btn-primary" style="flex:1;">▶️ Iniciar</button>
-                                <button id="btn-finalizar" class="btn-danger" style="flex:1;">⏹️ Finalizar</button>
-                            </div>
+                        <div style="display:flex; gap:10px; margin-bottom:16px;">
+                            <button id="btn-iniciar" class="btn-primary" style="flex:1;">▶️ Iniciar</button>
+                            <button id="btn-finalizar" class="btn-danger" style="flex:1;">⏹️ Finalizar</button>
                         </div>
                         <div class="timer-display" id="timer">00:00</div>
                         <div class="progress-bar"><div class="fill" id="timer-progress" style="width:0%;"></div></div>
@@ -157,14 +132,18 @@
                     </div>
                 </section>
 
+                <!-- =================== -->
                 <!-- TAB: FLASHCARDS -->
+                <!-- =================== -->
                 <section id="tab-flashcards" class="tab-content">
                     <h1>🃏 Flashcards</h1>
                     <p class="subtitle">Revisão espaçada – revise hoje!</p>
                     <div id="flashcards-lista" class="card"></div>
                 </section>
 
+                <!-- =================== -->
                 <!-- TAB: REDAÇÃO -->
+                <!-- =================== -->
                 <section id="tab-redacao" class="tab-content">
                     <h1>✍️ Corretor de Redação</h1>
                     <p class="subtitle">Cole sua redação e receba correção estilo ENEM.</p>
@@ -175,20 +154,22 @@
                     </div>
                 </section>
 
-                <!-- TAB: VESTIBULINHO -->
+                <!-- =================== -->
+                <!-- TAB: VESTIBULINHO (20 questões) -->
+                <!-- =================== -->
                 <section id="tab-vestibulinho" class="tab-content">
                     <h1>📊 Vestibulinho</h1>
-                    <p class="subtitle">45 questões geradas por IA.</p>
+                    <p class="subtitle">20 questões geradas por IA.</p>
                     <button id="btn-gerar-vest" class="btn-primary" style="margin-bottom:20px;">🔄 Gerar Simulado</button>
                     <div id="vestibulinho-container"></div>
                 </section>
 
+                <!-- =================== -->
                 <!-- TAB: GRUPO -->
+                <!-- =================== -->
                 <section id="tab-grupo" class="tab-content">
                     <h1>👥 Grupo de Estudos</h1>
                     <p class="subtitle">Estude com amigos, compartilhe progresso.</p>
-
-                    <!-- Criar Grupo -->
                     <div class="card">
                         <h3>➕ Criar Grupo</h3>
                         <div class="flex-row">
@@ -197,8 +178,6 @@
                             <button id="btn-criar-grupo" class="btn-primary">Criar</button>
                         </div>
                     </div>
-
-                    <!-- Entrar em Grupo -->
                     <div class="card">
                         <h3>🔑 Entrar em Grupo</h3>
                         <div class="flex-row">
@@ -206,15 +185,17 @@
                             <button id="btn-entrar-grupo" class="btn-secondary">Entrar</button>
                         </div>
                     </div>
-
-                    <!-- Meu Grupo Atual -->
                     <div id="meu-grupo-info" class="card" style="display:none;">
                         <h3 id="grupo-nome-exibido">📌 Nome do Grupo</h3>
                         <p id="grupo-desc-exibido" style="color:#94A3B8;">Descrição</p>
                         <p><strong>Código:</strong> <span id="grupo-codigo-exibido">XXXXXX</span></p>
                         <button id="btn-sair-grupo" class="btn-danger" style="margin-top:8px;">🚪 Sair do Grupo</button>
                         <hr style="border-color:#2D3448; margin:16px 0;">
-                        <h4>📊 Ranking do Grupo</h4>
+                        <h4>📊 Ranking</h4>
+                        <div style="display:flex; gap:10px; margin-bottom:8px;">
+                            <button id="btn-ranking-semanal" class="btn-secondary" style="flex:1;">Semanal</button>
+                            <button id="btn-ranking-mensal" class="btn-secondary" style="flex:1;">Mensal</button>
+                        </div>
                         <div id="ranking-grupo-lista"></div>
                         <hr style="border-color:#2D3448; margin:16px 0;">
                         <h4>💬 Chat do Grupo</h4>
@@ -226,27 +207,27 @@
                     </div>
                 </section>
 
+                <!-- =================== -->
                 <!-- TAB: AULAS -->
+                <!-- =================== -->
                 <section id="tab-aulas" class="tab-content">
                     <h1>🎬 Aulas</h1>
                     <p class="subtitle">Playlists do YouTube para estudar.</p>
-
-                    <!-- Adicionar aula (apenas admin) -->
                     <div class="card" id="admin-aulas" style="display:none;">
                         <h3>➕ Adicionar Aula</h3>
                         <div class="flex-row">
-                            <input type="text" id="aula-categoria" placeholder="Categoria (ex: Matemática)" style="flex:1;">
-                            <input type="text" id="aula-titulo" placeholder="Título da playlist" style="flex:2;">
+                            <input type="text" id="aula-categoria" placeholder="Categoria" style="flex:1;">
+                            <input type="text" id="aula-titulo" placeholder="Título" style="flex:2;">
                             <input type="url" id="aula-link" placeholder="URL do YouTube" style="flex:2;">
                             <button id="btn-add-aula" class="btn-primary">Adicionar</button>
                         </div>
                     </div>
-
-                    <!-- Lista de aulas -->
                     <div id="aulas-lista" class="card"></div>
                 </section>
 
+                <!-- =================== -->
                 <!-- TAB: RELATÓRIOS -->
+                <!-- =================== -->
                 <section id="tab-relatorios" class="tab-content">
                     <h1>📈 Relatórios</h1>
                     <p class="subtitle">Acompanhe sua evolução.</p>
