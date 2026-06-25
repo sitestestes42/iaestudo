@@ -9,7 +9,7 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_
 // ================================================================
 //  CONFIGURAÇÃO GROQ
 // ================================================================
-const GROQ_API_KEY = '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'; // COLOQUE SUA NOVA CHAVE AQUI
+const GROQ_API_KEY = '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'; // SUBSTITUA PELA SUA NOVA CHAVE
 
 // ================================================================
 //  E-MAIL ADMIN
@@ -167,7 +167,7 @@ function entrarNoApp(user) {
     telaLogin.style.display = 'none';
     appPrincipal.style.display = 'block';
     const nome = user.email.split('@')[0];
-    saudacaoTopo.innerHTML = `Olá, <strong>${nome}</strong> 👋`;
+    saudacaoTopo.innerHTML = `Olá, <strong>${nome}</strong> 🌟`;
     drawerUsuario.textContent = nome;
 
     if (user.email === adminEmail) {
@@ -194,7 +194,6 @@ async function carregarConversas() {
         if (error) throw error;
         conversas = data || [];
         if (conversas.length === 0) {
-            // Criar primeira conversa
             await criarNovaConversa();
         } else {
             conversaAtual = conversas[0];
@@ -223,9 +222,7 @@ async function criarNovaConversa(titulo = 'Nova conversa') {
         conversas.unshift(data);
         conversaAtual = data;
         renderizarListaConversas();
-        // Limpa mensagens do chat
         document.getElementById('chat-mensagens').innerHTML = '';
-        // Não mostra saudação
     } catch (e) {
         console.error('Erro ao criar conversa:', e);
     }
@@ -294,7 +291,6 @@ async function carregarMensagensConversa(conversaId) {
         const chatMsg = document.getElementById('chat-mensagens');
         chatMsg.innerHTML = '';
         if (!data || data.length === 0) {
-            // Não mostra saudação
             return;
         }
         data.forEach(msg => {
@@ -325,7 +321,6 @@ async function salvarMensagem(conversaId, texto, tipo) {
                 tipo: tipo,
                 created_at: new Date().toISOString()
             });
-        // Atualizar timestamp da conversa
         await supabaseClient
             .from('conversas')
             .update({ updated_at: new Date().toISOString() })
@@ -336,7 +331,7 @@ async function salvarMensagem(conversaId, texto, tipo) {
 }
 
 // ================================================================
-//  CHAT (SEM SAUDAÇÃO)
+//  CHAT
 // ================================================================
 const chatInput = document.getElementById('chat-input');
 const btnChat = document.getElementById('btn-chat-enviar');
@@ -532,7 +527,6 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
             };
         }
 
-        // Salvar sessão no Supabase
         await supabaseClient.from('sessoes').insert({
             usuario_id: usuarioAtual.id,
             duracao: duracao,
@@ -540,7 +534,6 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
             data: hoje()
         });
 
-        // Salvar flashcards
         if (resultado.flashcards) {
             for (const card of resultado.flashcards) {
                 const partes = card.split('|');
@@ -554,7 +547,6 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
             }
         }
 
-        // Exibir resultado
         const div = document.getElementById('resultado-pos');
         let html = `<h4>📌 Resumo</h4><div>${formatarMarkdown(resultado.resumo || '')}</div>`;
         html += `<h4>🔑 Flashcards</h4>`;
@@ -588,7 +580,7 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
 });
 
 // ================================================================
-//  VESTIBULINHO (20 questões com explicações detalhadas)
+//  VESTIBULINHO (20 questões)
 // ================================================================
 let questoesVest = [];
 let respostasVest = {};
@@ -708,22 +700,29 @@ function finalizarVestibulinho() {
 }
 
 // ================================================================
-//  GRUPOS (com ranking semanal/mensal)
+//  GRUPOS (CORRIGIDO)
 // ================================================================
 async function carregarGrupoDoUsuario() {
     if (!usuarioAtual) return;
     try {
+        // Buscar membros_grupo com join em grupos
         const { data, error } = await supabaseClient
             .from('membros_grupo')
             .select('grupo_id, grupos(*)')
-            .eq('usuario_id', usuarioAtual.id)
-            .single();
-        if (error && error.code !== 'PGRST116') throw error;
-        if (data) {
-            grupoAtual = data.grupos;
+            .eq('usuario_id', usuarioAtual.id);
+        if (error) throw error;
+        if (data && data.length > 0) {
+            // Pega o primeiro grupo (você pode ajustar para múltiplos)
+            const membro = data[0];
+            grupoAtual = membro.grupos;
             mostrarGrupoAtual(grupoAtual);
+        } else {
+            // Usuário não está em nenhum grupo
+            document.getElementById('meu-grupo-info').style.display = 'none';
         }
-    } catch (e) { console.error('Erro ao carregar grupo:', e); }
+    } catch (e) {
+        console.error('Erro ao carregar grupo:', e);
+    }
 }
 
 function mostrarGrupoAtual(grupo) {
@@ -733,7 +732,7 @@ function mostrarGrupoAtual(grupo) {
     document.getElementById('grupo-desc-exibido').textContent = grupo.descricao || 'Sem descrição';
     document.getElementById('grupo-codigo-exibido').textContent = grupo.codigo_convite;
     carregarRankingGrupo(grupo.id, 'semanal');
-    carregarChatGrupo(grupo.id);
+    carregarChatGrupo(grupo.id); // <-- ESSA FUNÇÃO AGORA EXISTE
 }
 
 document.getElementById('btn-criar-grupo').addEventListener('click', async () => {
@@ -815,17 +814,19 @@ async function carregarRankingGrupo(grupoId, periodo) {
         const dataInicio = periodo === 'semanal' 
             ? new Date(new Date().setDate(new Date().getDate() - 7)).toISOString()
             : new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString();
+
+        // Buscar sessões do grupo no período, com join em auth.users para obter email
         const { data, error } = await supabaseClient
             .from('sessoes')
-            .select('usuario_id, duracao, usuarios(email)')
+            .select('usuario_id, duracao, auth_users(email)')
             .eq('grupo_id', grupoId)
-            .gte('created_at', dataInicio)
-            .order('duracao', { ascending: false });
+            .gte('created_at', dataInicio);
         if (error) throw error;
+
         // Agrupar por usuário
         const ranking = {};
         data.forEach(item => {
-            const email = item.usuarios?.email || 'Usuário';
+            const email = item.auth_users?.email || 'Usuário';
             const nome = email.split('@')[0];
             if (!ranking[nome]) ranking[nome] = 0;
             ranking[nome] += item.duracao || 0;
@@ -844,10 +845,77 @@ async function carregarRankingGrupo(grupoId, periodo) {
         div.innerHTML = html;
     } catch (e) {
         console.error('Erro ao carregar ranking:', e);
+        document.getElementById('ranking-grupo-lista').innerHTML = '<p style="color:#F87171;">Erro ao carregar ranking.</p>';
     }
 }
 
-// Chat do grupo (realtime) – mesmo código anterior
+// ================================================================
+//  CHAT DO GRUPO (CORRIGIDO)
+// ================================================================
+async function carregarChatGrupo(grupoId) {
+    const container = document.getElementById('chat-grupo-mensagens');
+    try {
+        const { data, error } = await supabaseClient
+            .from('mensagens_grupo')
+            .select('*')
+            .eq('grupo_id', grupoId)
+            .order('created_at', { ascending: true })
+            .limit(50);
+        if (error) throw error;
+        container.innerHTML = '';
+        data.forEach(msg => {
+            const div = document.createElement('div');
+            div.className = 'msg-grupo';
+            div.innerHTML = `<strong>${msg.usuario_email}</strong>: ${msg.texto} <span class="time">${new Date(msg.created_at).toLocaleTimeString()}</span>`;
+            container.appendChild(div);
+        });
+        container.scrollTop = container.scrollHeight;
+    } catch (e) {
+        console.error('Erro ao carregar chat do grupo:', e);
+    }
+
+    if (chatGrupoSubscription) {
+        chatGrupoSubscription.unsubscribe();
+    }
+    chatGrupoSubscription = supabaseClient
+        .channel('mensagens_grupo')
+        .on('postgres_changes', {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'mensagens_grupo',
+            filter: `grupo_id=eq.${grupoId}`
+        }, (payload) => {
+            const msg = payload.new;
+            const div = document.createElement('div');
+            div.className = 'msg-grupo';
+            div.innerHTML = `<strong>${msg.usuario_email}</strong>: ${msg.texto} <span class="time">${new Date(msg.created_at).toLocaleTimeString()}</span>`;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        })
+        .subscribe();
+
+    // Remove listeners antigos para não duplicar
+    const btnEnviar = document.getElementById('btn-chat-grupo-enviar');
+    const newBtn = btnEnviar.cloneNode(true);
+    btnEnviar.parentNode.replaceChild(newBtn, btnEnviar);
+    newBtn.addEventListener('click', async () => {
+        const input = document.getElementById('chat-grupo-input');
+        const texto = input.value.trim();
+        if (!texto || !grupoAtual || !usuarioAtual) return;
+        try {
+            await supabaseClient.from('mensagens_grupo').insert({
+                grupo_id: grupoAtual.id,
+                usuario_id: usuarioAtual.id,
+                usuario_email: usuarioAtual.email.split('@')[0],
+                texto: texto,
+                created_at: new Date().toISOString()
+            });
+            input.value = '';
+        } catch (e) {
+            console.error('Erro ao enviar mensagem:', e);
+        }
+    });
+}
 
 // ================================================================
 //  AULAS
@@ -998,7 +1066,6 @@ overlay.addEventListener('click', () => {
     overlay.classList.remove('show');
 });
 
-// Navegação pelo drawer
 document.querySelectorAll('.drawer-item').forEach(item => {
     item.addEventListener('click', function() {
         document.querySelectorAll('.drawer-item').forEach(i => i.classList.remove('active'));
@@ -1011,10 +1078,12 @@ document.querySelectorAll('.drawer-item').forEach(item => {
         if (tab === 'flashcards') carregarFlashcards();
         if (tab === 'relatorios') carregarRelatorios();
         if (tab === 'chat') {
-            // Se não houver conversa, criar uma
             if (!conversaAtual && conversas.length === 0) {
                 criarNovaConversa();
             }
+        }
+        if (tab === 'grupo') {
+            carregarGrupoDoUsuario();
         }
     });
 });
@@ -1023,5 +1092,5 @@ document.querySelectorAll('.drawer-item').forEach(item => {
 //  INICIALIZAÇÃO
 // ================================================================
 console.log('🚀 StudyAI v2.0 carregado!');
-console.log('✅ Conversas | Tela cheia | Cronômetro | Vestibulinho 20 | Grupos');
-console.log(`👑 Admin: ${adminEmail}`);
+console.log('Conversas | Tela cheia | Cronômetro | Vestibulinho 20 | Grupos');
+console.log(`Admin: ${adminEmail}`);
