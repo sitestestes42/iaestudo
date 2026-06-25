@@ -451,12 +451,12 @@ input:focus, select:focus, textarea:focus {
 }
 
 /* ============================================================
-   CHAT (CORRIGIDO)
+   CHAT – ESTILO MODERNO (ATUALIZADO)
    ============================================================ */
 .chat-container {
     display: flex;
     flex-direction: column;
-    height: 100%;
+    width: 100%;
 }
 
 .chat-mensagens {
@@ -511,44 +511,52 @@ input:focus, select:focus, textarea:focus {
 .mensagem.ia th { background: #1A1F2E; color: #F1F5F9; }
 .mensagem.ia td { color: #94A3B8; }
 
-/* ===== CHAT INPUT AREA – CORRIGIDA ===== */
+/* ===== CHAT INPUT – ESTILO MODERNO ===== */
 .chat-input-area {
     display: flex;
-    gap: 10px;
     align-items: center;
-    margin-top: 8px;
+    gap: 10px;
+    background: #1A1F2E;
+    border: 1px solid #2D3448;
+    border-radius: 16px;
+    padding: 6px 6px 6px 18px;
+    transition: border-color 0.2s, box-shadow 0.2s;
     width: 100%;
 }
 
-.chat-input-area input {
-    flex: 1;
-    padding: 12px 16px;
-    border-radius: 12px;
-    border: 1px solid #2D3448;
-    background: #0B0E14;
-    color: #F1F5F9;
-    font-size: 15px;
-    outline: none;
-    transition: 0.2s;
-    min-width: 0;
-}
-
-.chat-input-area input:focus {
+.chat-input-area:focus-within {
     border-color: #7C3AED;
     box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
 }
 
-.chat-input-area button {
-    padding: 12px 20px;
-    border-radius: 12px;
+.chat-input-area input {
+    flex: 1;
+    background: transparent;
     border: none;
-    background: #7C3AED;
-    color: white;
-    font-weight: 600;
+    padding: 12px 0;
+    color: #F1F5F9;
     font-size: 15px;
+    outline: none;
+    min-width: 0;
+}
+
+.chat-input-area input::placeholder {
+    color: #6B7280;
+}
+
+.chat-input-area button {
+    background: #7C3AED;
+    border: none;
+    border-radius: 12px;
+    width: 46px;
+    height: 46px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 18px;
     cursor: pointer;
-    transition: 0.2s;
-    white-space: nowrap;
+    transition: background 0.2s, transform 0.1s;
     flex-shrink: 0;
 }
 
@@ -556,9 +564,14 @@ input:focus, select:focus, textarea:focus {
     background: #6D28D9;
 }
 
+.chat-input-area button:active {
+    transform: scale(0.94);
+}
+
 .chat-input-area button:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+    transform: none;
 }
 
 .chat-sugestoes {
@@ -643,12 +656,16 @@ input:focus, select:focus, textarea:focus {
     .login-container { padding: 16px; }
     .aula-item { flex-direction: column; align-items: flex-start; }
     .aula-item .thumb { width: 100%; height: auto; aspect-ratio: 16/9; }
+    .chat-input-area {
+        padding: 4px 4px 4px 14px;
+    }
     .chat-input-area input {
         font-size: 14px;
-        padding: 10px 14px;
+        padding: 10px 0;
     }
     .chat-input-area button {
-        font-size: 14px;
-        padding: 10px 16px;
+        width: 42px;
+        height: 42px;
+        font-size: 16px;
     }
 }
