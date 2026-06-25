@@ -7,9 +7,9 @@ const SUPABASE_ANON_KEY = 'sb_publishable_ucBzmjp0Xbwi7Z-RHsk4Yg_LydKnMMZ';
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ================================================================
-//  CONFIGURAÇÃO GROQ
+//  CONFIGURAÇÃO GROQ – COLOQUE SUA NOVA CHAVE AQUI!
 // ================================================================
-const GROQ_API_KEY = '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'; // SUBSTITUA PELA SUA NOVA CHAVE
+const GROQ_API_KEY = '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'; // <-- SUBSTITUA PELA NOVA CHAVE
 
 // ================================================================
 //  E-MAIL ADMIN
@@ -19,13 +19,6 @@ const adminEmail = 'ruasflavio29@gmail.com';
 // ================================================================
 //  UTILITÁRIOS
 // ================================================================
-const LS = {
-    get(k, def = null) {
-        try { return JSON.parse(localStorage.getItem(k)) || def; } catch { return def; }
-    },
-    set(k, v) { localStorage.setItem(k, JSON.stringify(v)); }
-};
-
 function hoje() { return new Date().toISOString().split('T')[0]; }
 function formatarTempo(seg) {
     const m = String(Math.floor(seg / 60)).padStart(2, '0');
@@ -38,6 +31,7 @@ let grupoAtual = null;
 let chatGrupoSubscription = null;
 let conversaAtual = null;
 let conversas = [];
+let usuarioNomeExibicao = '';
 
 // ================================================================
 //  LOGIN / AUTENTICAÇÃO
@@ -163,16 +157,39 @@ btnSair.addEventListener('click', async () => {
     appPrincipal.style.display = 'none';
 });
 
-function entrarNoApp(user) {
+// ================================================================
+//  ENTRAR NO APP
+// ================================================================
+async function entrarNoApp(user) {
     telaLogin.style.display = 'none';
     appPrincipal.style.display = 'block';
-    const nome = user.email.split('@')[0];
-    saudacaoTopo.innerHTML = `Olá, <strong>${nome}</strong> 🌟`;
-    drawerUsuario.textContent = nome;
+
+    // Buscar nome personalizado
+    try {
+        const { data, error } = await supabaseClient
+            .from('usuarios')
+            .select('nome_exibicao')
+            .eq('id', user.id)
+            .single();
+        if (!error && data?.nome_exibicao) {
+            usuarioNomeExibicao = data.nome_exibicao;
+        } else {
+            usuarioNomeExibicao = user.email.split('@')[0];
+        }
+    } catch (e) {
+        usuarioNomeExibicao = user.email.split('@')[0];
+    }
+
+    saudacaoTopo.innerHTML = `Olá, <strong>${usuarioNomeExibicao}</strong> 🌟`;
+    drawerUsuario.textContent = usuarioNomeExibicao;
+    window.usuarioNomeExibicao = usuarioNomeExibicao;
 
     if (user.email === adminEmail) {
         document.getElementById('admin-aulas').style.display = 'block';
     }
+
+    // Adicionar botão para editar nome
+    adicionarBotaoEditarNome();
 
     carregarDadosUsuario();
     carregarConversas();
@@ -180,8 +197,72 @@ function entrarNoApp(user) {
     carregarAulas();
 }
 
+function adicionarBotaoEditarNome() {
+    const topBarRight = document.querySelector('.top-bar-right');
+    const btnEditar = document.createElement('button');
+    btnEditar.textContent = '✏️ Nome';
+    btnEditar.className = 'btn-sair';
+    btnEditar.style.marginRight = '8px';
+    btnEditar.addEventListener('click', criarModalNome);
+    topBarRight.insertBefore(btnEditar, topBarRight.firstChild);
+}
+
 // ================================================================
-//  SISTEMA DE CONVERSAS
+//  PERSONALIZAR NOME DE USUÁRIO
+// ================================================================
+function criarModalNome() {
+    const overlay = document.createElement('div');
+    overlay.id = 'modal-nome';
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center;
+        z-index: 9999; backdrop-filter: blur(4px);
+    `;
+    overlay.innerHTML = `
+        <div style="background: #1A1F2E; border-radius: 20px; padding: 32px; max-width: 400px; width: 90%; border: 1px solid #2D3448; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);">
+            <h3 style="margin-bottom: 8px; color: #F1F5F9;">✏️ Editar Nome</h3>
+            <p style="color: #94A3B8; font-size: 14px; margin-bottom: 16px;">Como você quer ser chamado?</p>
+            <input type="text" id="input-novo-nome" placeholder="Digite seu novo nome" value="${usuarioNomeExibicao}" style="width: 100%; padding: 12px 16px; background: #0B0E14; border: 1px solid #2D3448; border-radius: 12px; color: #F1F5F9; font-size: 16px; margin-bottom: 16px;">
+            <div style="display: flex; gap: 10px;">
+                <button onclick="salvarNomeUsuario()" style="flex:1; background: #7C3AED; color: white; border: none; padding: 12px; border-radius: 12px; font-weight: 600; cursor: pointer;">💾 Salvar</button>
+                <button onclick="fecharModalNome()" style="flex:1; background: #2D3448; color: #94A3B8; border: none; padding: 12px; border-radius: 12px; font-weight: 600; cursor: pointer;">Cancelar</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    document.getElementById('input-novo-nome').focus();
+}
+
+window.fecharModalNome = function() {
+    const modal = document.getElementById('modal-nome');
+    if (modal) modal.remove();
+};
+
+window.salvarNomeUsuario = async function() {
+    const input = document.getElementById('input-novo-nome');
+    const nome = input.value.trim();
+    if (!nome) { alert('Digite um nome válido.'); return; }
+
+    try {
+        const { error } = await supabaseClient
+            .from('usuarios')
+            .upsert({ id: usuarioAtual.id, nome_exibicao: nome });
+        if (error) throw error;
+
+        usuarioNomeExibicao = nome;
+        window.usuarioNomeExibicao = nome;
+        saudacaoTopo.innerHTML = `Olá, <strong>${nome}</strong> 🌟`;
+        drawerUsuario.textContent = nome;
+        fecharModalNome();
+        alert('✅ Nome atualizado com sucesso!');
+    } catch (e) {
+        console.error(e);
+        alert('Erro ao salvar nome.');
+    }
+};
+
+// ================================================================
+//  SISTEMA DE CONVERSAS (CORRIGIDO – SEM DUPLICAÇÃO)
 // ================================================================
 async function carregarConversas() {
     if (!usuarioAtual) return;
@@ -193,8 +274,10 @@ async function carregarConversas() {
             .order('updated_at', { ascending: false });
         if (error) throw error;
         conversas = data || [];
+
         if (conversas.length === 0) {
-            await criarNovaConversa();
+            // Criar apenas UMA conversa inicial
+            await criarNovaConversa('Nova conversa');
         } else {
             conversaAtual = conversas[0];
             renderizarListaConversas();
@@ -228,6 +311,33 @@ async function criarNovaConversa(titulo = 'Nova conversa') {
     }
 }
 
+// GERAR TÍTULO AUTOMÁTICO (via IA ou fallback)
+async function gerarTituloConversa(primeiraMensagem) {
+    if (!primeiraMensagem || primeiraMensagem.length < 5) return 'Nova conversa';
+    try {
+        const prompt = `Gere um título curto (máx 5 palavras) para uma conversa que começa com: "${primeiraMensagem}". Retorne apenas o título, sem aspas ou pontuação extra.`;
+        const titulo = await chamarGroq(prompt);
+        return titulo.trim().substring(0, 50);
+    } catch (e) {
+        // Fallback: usar as primeiras palavras da mensagem
+        const palavras = primeiraMensagem.split(' ').slice(0, 4).join(' ');
+        return palavras.length > 5 ? palavras : 'Nova conversa';
+    }
+}
+
+async function atualizarTituloConversa(conversaId, novoTitulo) {
+    if (!conversaId || !novoTitulo) return;
+    try {
+        await supabaseClient
+            .from('conversas')
+            .update({ titulo: novoTitulo, updated_at: new Date().toISOString() })
+            .eq('id', conversaId);
+        const conv = conversas.find(c => c.id === conversaId);
+        if (conv) conv.titulo = novoTitulo;
+        renderizarListaConversas();
+    } catch (e) { console.error('Erro ao atualizar título:', e); }
+}
+
 async function deletarConversa(id) {
     if (!confirm('Deseja deletar esta conversa?')) return;
     try {
@@ -242,7 +352,7 @@ async function deletarConversa(id) {
             if (conversaAtual) {
                 carregarMensagensConversa(conversaAtual.id);
             } else {
-                await criarNovaConversa();
+                await criarNovaConversa('Nova conversa');
             }
         }
         renderizarListaConversas();
@@ -290,9 +400,7 @@ async function carregarMensagensConversa(conversaId) {
         if (error) throw error;
         const chatMsg = document.getElementById('chat-mensagens');
         chatMsg.innerHTML = '';
-        if (!data || data.length === 0) {
-            return;
-        }
+        if (!data || data.length === 0) return;
         data.forEach(msg => {
             const div = document.createElement('div');
             div.className = `mensagem ${msg.tipo}`;
@@ -331,7 +439,7 @@ async function salvarMensagem(conversaId, texto, tipo) {
 }
 
 // ================================================================
-//  CHAT
+//  CHAT PRINCIPAL
 // ================================================================
 const chatInput = document.getElementById('chat-input');
 const btnChat = document.getElementById('btn-chat-enviar');
@@ -341,6 +449,16 @@ window.enviarPergunta = async function(pergunta) {
     adicionarMensagemLocal(pergunta, 'usuario');
     chatInput.value = '';
     await salvarMensagem(conversaAtual.id, pergunta, 'usuario');
+
+    // Gerar título automático (se for a primeira mensagem da conversa)
+    const { count } = await supabaseClient
+        .from('mensagens')
+        .select('*', { count: 'exact', head: true })
+        .eq('conversa_id', conversaAtual.id);
+    if (count === 1) {
+        const novoTitulo = await gerarTituloConversa(pergunta);
+        await atualizarTituloConversa(conversaAtual.id, novoTitulo);
+    }
 
     const loadingDiv = document.createElement('div');
     loadingDiv.className = 'mensagem ia';
@@ -464,7 +582,7 @@ async function chamarGroq(prompt, modelo = 'openai/gpt-oss-120b') {
 }
 
 // ================================================================
-//  CRONÔMETRO (SEM SELETOR)
+//  CRONÔMETRO
 // ================================================================
 let estadoEstudo = {
     estudando: false,
@@ -531,7 +649,8 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
             usuario_id: usuarioAtual.id,
             duracao: duracao,
             descricao: descricao,
-            data: hoje()
+            data: hoje(),
+            grupo_id: grupoAtual?.id || null
         });
 
         if (resultado.flashcards) {
@@ -580,7 +699,7 @@ document.getElementById('btn-gerar-pos').addEventListener('click', async () => {
 });
 
 // ================================================================
-//  VESTIBULINHO (20 questões)
+//  VESTIBULINHO
 // ================================================================
 let questoesVest = [];
 let respostasVest = {};
@@ -700,25 +819,20 @@ function finalizarVestibulinho() {
 }
 
 // ================================================================
-//  GRUPOS (CORRIGIDO)
+//  GRUPOS – COMPLETO (MEMBROS + CHAT CORRIGIDO)
 // ================================================================
 async function carregarGrupoDoUsuario() {
     if (!usuarioAtual) return;
     try {
-        // Buscar membros_grupo com join em grupos
         const { data, error } = await supabaseClient
             .from('membros_grupo')
             .select('grupo_id, grupos(*)')
-            .eq('usuario_id', usuarioAtual.id);
-        if (error) throw error;
-        if (data && data.length > 0) {
-            // Pega o primeiro grupo (você pode ajustar para múltiplos)
-            const membro = data[0];
-            grupoAtual = membro.grupos;
+            .eq('usuario_id', usuarioAtual.id)
+            .single();
+        if (error && error.code !== 'PGRST116') throw error;
+        if (data) {
+            grupoAtual = data.grupos;
             mostrarGrupoAtual(grupoAtual);
-        } else {
-            // Usuário não está em nenhum grupo
-            document.getElementById('meu-grupo-info').style.display = 'none';
         }
     } catch (e) {
         console.error('Erro ao carregar grupo:', e);
@@ -727,12 +841,40 @@ async function carregarGrupoDoUsuario() {
 
 function mostrarGrupoAtual(grupo) {
     const div = document.getElementById('meu-grupo-info');
+    if (!div) return;
     div.style.display = 'block';
     document.getElementById('grupo-nome-exibido').textContent = `📌 ${grupo.nome}`;
     document.getElementById('grupo-desc-exibido').textContent = grupo.descricao || 'Sem descrição';
     document.getElementById('grupo-codigo-exibido').textContent = grupo.codigo_convite;
+
+    carregarMembrosGrupo(grupo.id);
     carregarRankingGrupo(grupo.id, 'semanal');
-    carregarChatGrupo(grupo.id); // <-- ESSA FUNÇÃO AGORA EXISTE
+    carregarChatGrupo(grupo.id);
+}
+
+async function carregarMembrosGrupo(grupoId) {
+    try {
+        const { data, error } = await supabaseClient
+            .from('membros_grupo')
+            .select('usuario_id, usuarios(nome_exibicao)')
+            .eq('grupo_id', grupoId);
+        if (error) throw error;
+        const container = document.getElementById('membros-grupo-lista');
+        if (!container) return;
+        if (!data || data.length === 0) {
+            container.innerHTML = '<p style="color:#94A3B8;">Nenhum membro.</p>';
+            return;
+        }
+        let html = '<div style="display:flex; flex-wrap:wrap; gap:8px;">';
+        data.forEach(m => {
+            const nome = m.usuarios?.nome_exibicao || 'Usuário';
+            html += `<span style="background:#1A1F2E; padding:4px 12px; border-radius:20px; border:1px solid #2D3448; font-size:13px;">👤 ${nome}</span>`;
+        });
+        html += '</div>';
+        container.innerHTML = html;
+    } catch (e) {
+        console.error('Erro ao carregar membros:', e);
+    }
 }
 
 document.getElementById('btn-criar-grupo').addEventListener('click', async () => {
@@ -810,24 +952,28 @@ document.getElementById('btn-ranking-mensal').addEventListener('click', () => {
 });
 
 async function carregarRankingGrupo(grupoId, periodo) {
+    if (!grupoId) return;
     try {
-        const dataInicio = periodo === 'semanal' 
-            ? new Date(new Date().setDate(new Date().getDate() - 7)).toISOString()
-            : new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString();
-
-        // Buscar sessões do grupo no período, com join em auth.users para obter email
+        const hojeStr = new Date().toISOString();
+        let dataInicio;
+        if (periodo === 'semanal') {
+            const d = new Date();
+            d.setDate(d.getDate() - 7);
+            dataInicio = d.toISOString();
+        } else {
+            const d = new Date();
+            d.setMonth(d.getMonth() - 1);
+            dataInicio = d.toISOString();
+        }
         const { data, error } = await supabaseClient
             .from('sessoes')
-            .select('usuario_id, duracao, auth_users(email)')
+            .select('usuario_id, duracao, usuarios(nome_exibicao)')
             .eq('grupo_id', grupoId)
             .gte('created_at', dataInicio);
         if (error) throw error;
-
-        // Agrupar por usuário
         const ranking = {};
         data.forEach(item => {
-            const email = item.auth_users?.email || 'Usuário';
-            const nome = email.split('@')[0];
+            const nome = item.usuarios?.nome_exibicao || 'Usuário';
             if (!ranking[nome]) ranking[nome] = 0;
             ranking[nome] += item.duracao || 0;
         });
@@ -845,15 +991,17 @@ async function carregarRankingGrupo(grupoId, periodo) {
         div.innerHTML = html;
     } catch (e) {
         console.error('Erro ao carregar ranking:', e);
-        document.getElementById('ranking-grupo-lista').innerHTML = '<p style="color:#F87171;">Erro ao carregar ranking.</p>';
     }
 }
 
 // ================================================================
-//  CHAT DO GRUPO (CORRIGIDO)
+//  CHAT DO GRUPO – CORRIGIDO COM REALTIME
 // ================================================================
 async function carregarChatGrupo(grupoId) {
     const container = document.getElementById('chat-grupo-mensagens');
+    if (!container) return;
+
+    // Carregar mensagens recentes
     try {
         const { data, error } = await supabaseClient
             .from('mensagens_grupo')
@@ -866,14 +1014,15 @@ async function carregarChatGrupo(grupoId) {
         data.forEach(msg => {
             const div = document.createElement('div');
             div.className = 'msg-grupo';
-            div.innerHTML = `<strong>${msg.usuario_email}</strong>: ${msg.texto} <span class="time">${new Date(msg.created_at).toLocaleTimeString()}</span>`;
+            div.innerHTML = `<strong>${msg.usuario_email || 'Usuário'}</strong>: ${msg.texto} <span class="time">${new Date(msg.created_at).toLocaleTimeString()}</span>`;
             container.appendChild(div);
         });
         container.scrollTop = container.scrollHeight;
     } catch (e) {
-        console.error('Erro ao carregar chat do grupo:', e);
+        console.error('Erro ao carregar mensagens do grupo:', e);
     }
 
+    // Inscrever para novas mensagens (Realtime)
     if (chatGrupoSubscription) {
         chatGrupoSubscription.unsubscribe();
     }
@@ -888,32 +1037,34 @@ async function carregarChatGrupo(grupoId) {
             const msg = payload.new;
             const div = document.createElement('div');
             div.className = 'msg-grupo';
-            div.innerHTML = `<strong>${msg.usuario_email}</strong>: ${msg.texto} <span class="time">${new Date(msg.created_at).toLocaleTimeString()}</span>`;
+            div.innerHTML = `<strong>${msg.usuario_email || 'Usuário'}</strong>: ${msg.texto} <span class="time">${new Date(msg.created_at).toLocaleTimeString()}</span>`;
             container.appendChild(div);
             container.scrollTop = container.scrollHeight;
         })
         .subscribe();
 
-    // Remove listeners antigos para não duplicar
+    // Enviar mensagem
     const btnEnviar = document.getElementById('btn-chat-grupo-enviar');
-    const newBtn = btnEnviar.cloneNode(true);
-    btnEnviar.parentNode.replaceChild(newBtn, btnEnviar);
-    newBtn.addEventListener('click', async () => {
-        const input = document.getElementById('chat-grupo-input');
+    const input = document.getElementById('chat-grupo-input');
+    btnEnviar.onclick = async () => {
         const texto = input.value.trim();
         if (!texto || !grupoAtual || !usuarioAtual) return;
         try {
             await supabaseClient.from('mensagens_grupo').insert({
                 grupo_id: grupoAtual.id,
                 usuario_id: usuarioAtual.id,
-                usuario_email: usuarioAtual.email.split('@')[0],
+                usuario_email: usuarioNomeExibicao || usuarioAtual.email.split('@')[0],
                 texto: texto,
                 created_at: new Date().toISOString()
             });
             input.value = '';
         } catch (e) {
             console.error('Erro ao enviar mensagem:', e);
+            alert('Erro ao enviar mensagem.');
         }
+    };
+    input.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') btnEnviar.click();
     });
 }
 
@@ -1046,7 +1197,7 @@ async function carregarRelatorios() {
 }
 
 // ================================================================
-//  DRAWER / MENU
+//  DRAWER
 // ================================================================
 const drawer = document.getElementById('drawer');
 const overlay = document.getElementById('drawer-overlay');
@@ -1082,9 +1233,6 @@ document.querySelectorAll('.drawer-item').forEach(item => {
                 criarNovaConversa();
             }
         }
-        if (tab === 'grupo') {
-            carregarGrupoDoUsuario();
-        }
     });
 });
 
@@ -1092,5 +1240,5 @@ document.querySelectorAll('.drawer-item').forEach(item => {
 //  INICIALIZAÇÃO
 // ================================================================
 console.log('🚀 StudyAI v2.0 carregado!');
-console.log('Conversas | Tela cheia | Cronômetro | Vestibulinho 20 | Grupos');
-console.log(`Admin: ${adminEmail}`);
+console.log('✅ Conversas | Títulos automáticos | Grupos com membros | Chat corrigido');
+console.log(`👑 Admin: ${adminEmail}`);
