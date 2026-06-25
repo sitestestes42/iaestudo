@@ -1,10 +1,9 @@
 // ================================================================
-//  CONFIGURAÇÃO SUPABASE
+//  CONFIGURAÇÃO SUPABASE (URL CORRIGIDA)
 // ================================================================
-const SUPABASE_URL = 'https://jfbfbcdcuvzqqcpzlmju.supabase.co';
+const SUPABASE_URL = 'https://vpihrpqvzrmixxdrqwbj.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_ucBzmjp0Xbwi7Z-RHsk4Yg_LydKnMMZ';
 
-// Usando window.supabase para evitar conflitos
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ================================================================
