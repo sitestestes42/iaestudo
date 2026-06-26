@@ -820,10 +820,14 @@ function finalizarVestibulinho() {
 // ================================================================
 //  GRUPOS – COMPLETO E CORRIGIDO (com persistência)
 // ================================================================
+// ================================================================
+//  GRUPOS – CORRIGIDO PARA FUNCIONAR NO CELULAR
+// ================================================================
+
 async function carregarGrupoDoUsuario() {
     if (!usuarioAtual) return;
     try {
-        // Tenta buscar do banco
+        // 1. Tenta buscar do banco
         const { data, error } = await supabaseClient
             .from('membros_grupo')
             .select('grupo_id, grupos(*)')
@@ -836,24 +840,67 @@ async function carregarGrupoDoUsuario() {
             grupoAtual = data.grupos;
             // Salva no localStorage para persistir
             localStorage.setItem('grupoAtual', JSON.stringify(grupoAtual));
+            localStorage.setItem('grupoId', grupoAtual.id);
             mostrarGrupoAtual(grupoAtual);
         } else {
-            // Se não encontrou no banco, tenta recuperar do localStorage
+            // 2. Se não encontrou no banco, tenta recuperar do localStorage
+            const grupoIdSalvo = localStorage.getItem('grupoId');
+            if (grupoIdSalvo) {
+                // Busca o grupo pelo ID salvo
+                const { data: grupoData, error: grupoError } = await supabaseClient
+                    .from('grupos')
+                    .select('*')
+                    .eq('id', grupoIdSalvo)
+                    .single();
+                
+                if (!grupoError && grupoData) {
+                    // Verifica se o usuário ainda é membro
+                    const { data: membro } = await supabaseClient
+                        .from('membros_grupo')
+                        .select('*')
+                        .eq('grupo_id', grupoData.id)
+                        .eq('usuario_id', usuarioAtual.id)
+                        .single();
+                    
+                    if (membro) {
+                        grupoAtual = grupoData;
+                        localStorage.setItem('grupoAtual', JSON.stringify(grupoAtual));
+                        mostrarGrupoAtual(grupoAtual);
+                        return;
+                    } else {
+                        // Se não é mais membro, limpa o cache
+                        localStorage.removeItem('grupoAtual');
+                        localStorage.removeItem('grupoId');
+                    }
+                } else {
+                    // Se o grupo não existe mais, limpa o cache
+                    localStorage.removeItem('grupoAtual');
+                    localStorage.removeItem('grupoId');
+                }
+            }
+            
+            // 3. Se ainda não encontrou, tenta recuperar o objeto completo do localStorage
             const salvo = localStorage.getItem('grupoAtual');
             if (salvo) {
-                const grupoSalvo = JSON.parse(salvo);
-                // Verifica se o usuário ainda é membro
-                const { data: membro } = await supabaseClient
-                    .from('membros_grupo')
-                    .select('*')
-                    .eq('grupo_id', grupoSalvo.id)
-                    .eq('usuario_id', usuarioAtual.id)
-                    .single();
-                if (membro) {
-                    grupoAtual = grupoSalvo;
-                    mostrarGrupoAtual(grupoAtual);
-                } else {
+                try {
+                    const grupoSalvo = JSON.parse(salvo);
+                    // Verifica se o usuário ainda é membro
+                    const { data: membro } = await supabaseClient
+                        .from('membros_grupo')
+                        .select('*')
+                        .eq('grupo_id', grupoSalvo.id)
+                        .eq('usuario_id', usuarioAtual.id)
+                        .single();
+                    if (membro) {
+                        grupoAtual = grupoSalvo;
+                        mostrarGrupoAtual(grupoAtual);
+                    } else {
+                        localStorage.removeItem('grupoAtual');
+                        localStorage.removeItem('grupoId');
+                    }
+                } catch (e) {
                     localStorage.removeItem('grupoAtual');
+                    localStorage.removeItem('grupoId');
                 }
             }
         }
@@ -862,8 +909,13 @@ async function carregarGrupoDoUsuario() {
         // Fallback: tenta recuperar do localStorage
         const salvo = localStorage.getItem('grupoAtual');
         if (salvo) {
-            grupoAtual = JSON.parse(salvo);
-            mostrarGrupoAtual(grupoAtual);
+            try {
+                grupoAtual = JSON.parse(salvo);
+                mostrarGrupoAtual(grupoAtual);
+            } catch (e2) {
+                localStorage.removeItem('grupoAtual');
+                localStorage.removeItem('grupoId');
+            }
         }
     }
 }
@@ -891,6 +943,267 @@ function mostrarGrupoAtual(grupo) {
     carregarChatGrupo(grupo.id);
 }
 
+async function carregarMembrosGrupo(grupoId) {
+    try {
+        const { data: membros, error } = await supabaseClient
+            .from('membros_grupo')
+            .select('usuario_id')
+            .eq('grupo_id', grupoId);
+        if (error) throw error;
+
+        const container = document.getElementById('membros-grupo-lista');
+        if (!membros || membros.length === 0) {
+            container.innerHTML = '<p style="color:#94A3B8;">Nenhum membro.</p>';
+            return;
+        }
+
+        const userIds = membros.map(m => m.usuario_id);
+        const { data: usuarios, error: err2 } = await supabaseClient
+            .from('usuarios')
+            .select('id, nome_exibicao')
+            .in('id', userIds);
+        if (err2) throw err2;
+
+        const nomeMap = {};
+        usuarios.forEach(u => {
+            nomeMap[u.id] = u.nome_exibicao || 'Usuário';
+        });
+
+        let html = '<div style="display:flex; flex-wrap:wrap; gap:8px;">';
+        membros.forEach(m => {
+            const nome = nomeMap[m.usuario_id] || 'Usuário';
+            html += `<span style="background:#1A1F2E; padding:4px 12px; border-radius:20px; border:1px solid #2D3448; font-size:13px;">👤 ${nome}</span>`;
+        });
+        html += '</div>';
+        container.innerHTML = html;
+    } catch (e) {
+        console.error('Erro ao carregar membros:', e);
+        const container = document.getElementById('membros-grupo-lista');
+        if (container) container.innerHTML = '<p style="color:#F87171;">Erro ao carregar membros.</p>';
+    }
+}
+
+document.getElementById('btn-criar-grupo').addEventListener('click', async () => {
+    const nome = document.getElementById('grupo-nome').value.trim();
+    const descricao = document.getElementById('grupo-descricao').value.trim();
+    if (!nome) { alert('Digite um nome para o grupo.'); return; }
+    const codigo = Math.random().toString(36).substring(2, 8).toUpperCase();
+    try {
+        const { data, error } = await supabaseClient.from('grupos').insert({
+            nome, descricao, codigo_convite: codigo, criador_id: usuarioAtual.id
+        }).select().single();
+        if (error) throw error;
+        await supabaseClient.from('membros_grupo').insert({
+            grupo_id: data.id, usuario_id: usuarioAtual.id
+        });
+        grupoAtual = data;
+        localStorage.setItem('grupoAtual', JSON.stringify(grupoAtual));
+        localStorage.setItem('grupoId', grupoAtual.id);
+        mostrarGrupoAtual(data);
+        alert(`✅ Grupo "${nome}" criado! Código: ${codigo}`);
+    } catch (e) {
+        alert('Erro ao criar grupo.');
+        console.error(e);
+    }
+});
+
+document.getElementById('btn-entrar-grupo').addEventListener('click', async () => {
+    const codigo = document.getElementById('grupo-convite').value.trim().toUpperCase();
+    if (!codigo) { alert('Digite o código de convite.'); return; }
+    try {
+        const { data, error } = await supabaseClient
+            .from('grupos')
+            .select('*')
+            .eq('codigo_convite', codigo)
+            .single();
+        if (error) throw error;
+        await supabaseClient.from('membros_grupo').insert({
+            grupo_id: data.id, usuario_id: usuarioAtual.id
+        });
+        grupoAtual = data;
+        localStorage.setItem('grupoAtual', JSON.stringify(grupoAtual));
+        localStorage.setItem('grupoId', grupoAtual.id);
+        mostrarGrupoAtual(data);
+        alert(`✅ Entrou no grupo "${data.nome}"!`);
+    } catch (e) {
+        alert('Código inválido ou grupo não encontrado.');
+        console.error(e);
+    }
+});
+
+document.getElementById('btn-sair-grupo').addEventListener('click', async () => {
+    if (!grupoAtual || !usuarioAtual) return;
+    if (!confirm(`Sair do grupo "${grupoAtual.nome}"?`)) return;
+    try {
+        await supabaseClient
+            .from('membros_grupo')
+            .delete()
+            .eq('grupo_id', grupoAtual.id)
+            .eq('usuario_id', usuarioAtual.id);
+        localStorage.removeItem('grupoAtual');
+        localStorage.removeItem('grupoId');
+        grupoAtual = null;
+        document.getElementById('meu-grupo-info').style.display = 'none';
+        alert('Você saiu do grupo.');
+    } catch (e) {
+        alert('Erro ao sair do grupo.');
+        console.error(e);
+    }
+});
+
+let rankingPeriodo = 'semanal';
+
+document.getElementById('btn-ranking-semanal').addEventListener('click', () => {
+    rankingPeriodo = 'semanal';
+    if (grupoAtual) carregarRankingGrupo(grupoAtual.id, 'semanal');
+});
+
+document.getElementById('btn-ranking-mensal').addEventListener('click', () => {
+    rankingPeriodo = 'mensal';
+    if (grupoAtual) carregarRankingGrupo(grupoAtual.id, 'mensal');
+});
+
+async function carregarRankingGrupo(grupoId, periodo) {
+    if (!grupoId) return;
+    try {
+        const dataInicio = new Date();
+        if (periodo === 'semanal') {
+            dataInicio.setDate(dataInicio.getDate() - 7);
+        } else {
+            dataInicio.setMonth(dataInicio.getMonth() - 1);
+        }
+        const inicioStr = dataInicio.toISOString();
+
+        const { data: sessoes, error } = await supabaseClient
+            .from('sessoes')
+            .select('usuario_id, duracao')
+            .eq('grupo_id', grupoId)
+            .gte('created_at', inicioStr);
+        if (error) throw error;
+
+        const rankingMap = {};
+        sessoes.forEach(s => {
+            const uid = s.usuario_id;
+            if (!rankingMap[uid]) rankingMap[uid] = 0;
+            rankingMap[uid] += s.duracao || 0;
+        });
+
+        const userIds = Object.keys(rankingMap);
+        const div = document.getElementById('ranking-grupo-lista');
+        if (userIds.length === 0) {
+            div.innerHTML = '<p style="color:#94A3B8;">Nenhum estudo registrado neste período.</p>';
+            return;
+        }
+
+        const { data: usuarios, error: err2 } = await supabaseClient
+            .from('usuarios')
+            .select('id, nome_exibicao')
+            .in('id', userIds);
+        if (err2) throw err2;
+
+        const nomeMap = {};
+        usuarios.forEach(u => {
+            nomeMap[u.id] = u.nome_exibicao || 'Usuário';
+        });
+
+        const ranking = userIds.map(uid => ({
+            nome: nomeMap[uid] || 'Usuário',
+            total: rankingMap[uid]
+        }));
+        ranking.sort((a, b) => b.total - a.total);
+
+        let html = '';
+        ranking.forEach((item, i) => {
+            const medalha = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}º`;
+            html += `<div class="ranking-item"><span class="pos">${medalha}</span><span class="nome">${item.nome}</span><span class="min">${item.total} min</span></div>`;
+        });
+        div.innerHTML = html;
+    } catch (e) {
+        console.error('Erro ao carregar ranking:', e);
+        const div = document.getElementById('ranking-grupo-lista');
+        if (div) div.innerHTML = '<p style="color:#F87171;">Erro ao carregar ranking.</p>';
+    }
+}
+
+// ================================================================
+//  CHAT DO GRUPO – CORRIGIDO
+// ================================================================
+async function carregarChatGrupo(grupoId) {
+    const container = document.getElementById('chat-grupo-mensagens');
+    if (!container) return;
+
+    try {
+        const { data, error } = await supabaseClient
+            .from('mensagens_grupo')
+            .select('*')
+            .eq('grupo_id', grupoId)
+            .order('created_at', { ascending: true })
+            .limit(50);
+        if (error) throw error;
+        container.innerHTML = '';
+        data.forEach(msg => {
+            const div = document.createElement('div');
+            div.className = 'msg-grupo';
+            div.innerHTML = `<strong>${msg.usuario_email || 'Usuário'}</strong>: ${msg.texto} <span class="time">${new Date(msg.created_at).toLocaleTimeString()}</span>`;
+            container.appendChild(div);
+        });
+        container.scrollTop = container.scrollHeight;
+    } catch (e) {
+        console.error('Erro ao carregar mensagens do grupo:', e);
+    }
+
+    if (chatGrupoSubscription) {
+        chatGrupoSubscription.unsubscribe();
+        chatGrupoSubscription = null;
+    }
+
+    chatGrupoSubscription = supabaseClient
+        .channel('mensagens_grupo')
+        .on('postgres_changes', {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'mensagens_grupo',
+            filter: `grupo_id=eq.${grupoId}`
+        }, (payload) => {
+            const msg = payload.new;
+            const div = document.createElement('div');
+            div.className = 'msg-grupo';
+            div.innerHTML = `<strong>${msg.usuario_email || 'Usuário'}</strong>: ${msg.texto} <span class="time">${new Date(msg.created_at).toLocaleTimeString()}</span>`;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        })
+        .subscribe();
+
+    const btnEnviar = document.getElementById('btn-chat-grupo-enviar');
+    const input = document.getElementById('chat-grupo-input');
+    
+    const novoBtn = btnEnviar.cloneNode(true);
+    btnEnviar.parentNode.replaceChild(novoBtn, btnEnviar);
+    const novoInput = input.cloneNode(true);
+    input.parentNode.replaceChild(novoInput, input);
+
+    novoBtn.onclick = async () => {
+        const texto = novoInput.value.trim();
+        if (!texto || !grupoAtual || !usuarioAtual) return;
+        try {
+            const { error } = await supabaseClient.from('mensagens_grupo').insert({
+                grupo_id: grupoAtual.id,
+                usuario_id: usuarioAtual.id,
+                usuario_email: usuarioNomeExibicao || usuarioAtual.email.split('@')[0],
+                texto: texto,
+                created_at: new Date().toISOString()
+            });
+            if (error) throw error;
+            novoInput.value = '';
+        } catch (e) {
+            console.error('Erro ao enviar mensagem:', e);
+            alert('Erro ao enviar mensagem.');
+        }
+    };
+    novoInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') novoBtn.click();
+    });
+}
 async function carregarMembrosGrupo(grupoId) {
     try {
         const { data: membros, error } = await supabaseClient
