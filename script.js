@@ -7,9 +7,9 @@ const SUPABASE_ANON_KEY = 'sb_publishable_ucBzmjp0Xbwi7Z-RHsk4Yg_LydKnMMZ';
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ================================================================
-//  CONFIGURAÇÃO GROQ – COLOQUE SUA NOVA CHAVE AQUI!
+//  CONFIGURAÇÃO GROQ – CHAVE INSERIDA
 // ================================================================
-const GROQ_API_KEY = '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'; // <-- SUBSTITUA PELA NOVA CHAVE
+const GROQ_API_KEY = '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';
 
 // ================================================================
 //  E-MAIL ADMIN
@@ -175,7 +175,6 @@ async function entrarNoApp(user) {
             usuarioNomeExibicao = data.nome_exibicao;
         } else {
             usuarioNomeExibicao = user.email.split('@')[0];
-            // Inserir nome se não existir
             await supabaseClient.from('usuarios').upsert({
                 id: user.id,
                 nome_exibicao: usuarioNomeExibicao
@@ -197,7 +196,7 @@ async function entrarNoApp(user) {
 
     carregarDadosUsuario();
     carregarConversas();
-    carregarGrupoDoUsuario();
+    carregarGrupoDoUsuario(); // Carrega o grupo ao logar
     carregarAulas();
 }
 
@@ -819,14 +818,7 @@ function finalizarVestibulinho() {
 }
 
 // ================================================================
-//  GRUPOS – CORRIGIDO (SEM JOINS PROBLEMÁTICOS)
-// ================================================================
-// ================================================================
-//  GRUPOS – CORRIGIDO (NOMES DE TABELAS CORRETOS)
-// ================================================================
-
-// ================================================================
-//  CARREGAR GRUPO DO USUÁRIO (COM PERSISTÊNCIA)
+//  GRUPOS – COMPLETO E CORRIGIDO (com persistência)
 // ================================================================
 async function carregarGrupoDoUsuario() {
     if (!usuarioAtual) return;
@@ -850,7 +842,7 @@ async function carregarGrupoDoUsuario() {
             const salvo = localStorage.getItem('grupoAtual');
             if (salvo) {
                 const grupoSalvo = JSON.parse(salvo);
-                // Verifica se o usuário ainda é membro (opcional, mas evita inconsistências)
+                // Verifica se o usuário ainda é membro
                 const { data: membro } = await supabaseClient
                     .from('membros_grupo')
                     .select('*')
@@ -875,9 +867,32 @@ async function carregarGrupoDoUsuario() {
         }
     }
 }
+
+function mostrarGrupoAtual(grupo) {
+    const div = document.getElementById('meu-grupo-info');
+    if (!div) return;
+    div.style.display = 'block';
+    document.getElementById('grupo-nome-exibido').textContent = `📌 ${grupo.nome}`;
+    document.getElementById('grupo-desc-exibido').textContent = grupo.descricao || 'Sem descrição';
+    document.getElementById('grupo-codigo-exibido').textContent = grupo.codigo_convite;
+
+    // Criar container para membros se não existir
+    let containerMembros = document.getElementById('membros-grupo-lista');
+    if (!containerMembros) {
+        const newContainer = document.createElement('div');
+        newContainer.id = 'membros-grupo-lista';
+        newContainer.style.marginTop = '8px';
+        newContainer.innerHTML = '<p style="color:#94A3B8;">Carregando membros...</p>';
+        div.insertBefore(newContainer, div.querySelector('hr'));
+    }
+
+    carregarMembrosGrupo(grupo.id);
+    carregarRankingGrupo(grupo.id, 'semanal');
+    carregarChatGrupo(grupo.id);
+}
+
 async function carregarMembrosGrupo(grupoId) {
     try {
-        // Buscar apenas os IDs dos membros (tabela correta: membros_grupo)
         const { data: membros, error } = await supabaseClient
             .from('membros_grupo')
             .select('usuario_id')
@@ -890,7 +905,6 @@ async function carregarMembrosGrupo(grupoId) {
             return;
         }
 
-        // Buscar nomes na tabela usuarios
         const userIds = membros.map(m => m.usuario_id);
         const { data: usuarios, error: err2 } = await supabaseClient
             .from('usuarios')
@@ -931,6 +945,7 @@ document.getElementById('btn-criar-grupo').addEventListener('click', async () =>
             grupo_id: data.id, usuario_id: usuarioAtual.id
         });
         grupoAtual = data;
+        localStorage.setItem('grupoAtual', JSON.stringify(grupoAtual));
         mostrarGrupoAtual(data);
         alert(`✅ Grupo "${nome}" criado! Código: ${codigo}`);
     } catch (e) {
@@ -953,6 +968,7 @@ document.getElementById('btn-entrar-grupo').addEventListener('click', async () =
             grupo_id: data.id, usuario_id: usuarioAtual.id
         });
         grupoAtual = data;
+        localStorage.setItem('grupoAtual', JSON.stringify(grupoAtual));
         mostrarGrupoAtual(data);
         alert(`✅ Entrou no grupo "${data.nome}"!`);
     } catch (e) {
@@ -970,6 +986,7 @@ document.getElementById('btn-sair-grupo').addEventListener('click', async () => 
             .delete()
             .eq('grupo_id', grupoAtual.id)
             .eq('usuario_id', usuarioAtual.id);
+        localStorage.removeItem('grupoAtual');
         grupoAtual = null;
         document.getElementById('meu-grupo-info').style.display = 'none';
         alert('Você saiu do grupo.');
@@ -1002,7 +1019,6 @@ async function carregarRankingGrupo(grupoId, periodo) {
         }
         const inicioStr = dataInicio.toISOString();
 
-        // Buscar sessões do grupo
         const { data: sessoes, error } = await supabaseClient
             .from('sessoes')
             .select('usuario_id, duracao')
@@ -1010,7 +1026,6 @@ async function carregarRankingGrupo(grupoId, periodo) {
             .gte('created_at', inicioStr);
         if (error) throw error;
 
-        // Agrupar minutos
         const rankingMap = {};
         sessoes.forEach(s => {
             const uid = s.usuario_id;
@@ -1025,155 +1040,6 @@ async function carregarRankingGrupo(grupoId, periodo) {
             return;
         }
 
-        // Buscar nomes
-        const { data: usuarios, error: err2 } = await supabaseClient
-            .from('usuarios')
-            .select('id, nome_exibicao')
-            .in('id', userIds);
-        if (err2) throw err2;
-
-        const nomeMap = {};
-        usuarios.forEach(u => {
-            nomeMap[u.id] = u.nome_exibicao || 'Usuário';
-        });
-
-        const ranking = userIds.map(uid => ({
-            nome: nomeMap[uid] || 'Usuário',
-            total: rankingMap[uid]
-        }));
-        ranking.sort((a, b) => b.total - a.total);
-
-        let html = '';
-        ranking.forEach((item, i) => {
-            const medalha = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}º`;
-            html += `<div class="ranking-item"><span class="pos">${medalha}</span><span class="nome">${item.nome}</span><span class="min">${item.total} min</span></div>`;
-        });
-        div.innerHTML = html;
-    } catch (e) {
-        console.error('Erro ao carregar ranking:', e);
-        const div = document.getElementById('ranking-grupo-lista');
-        if (div) div.innerHTML = '<p style="color:#F87171;">Erro ao carregar ranking.</p>';
-    }
-}
-
-// ================================================================
-//  CHAT DO GRUPO – CORRIGIDO (usando mensagens_grupo)
-// ================================================================
-async function carregarChatGrupo(grupoId) {
-    const container = document.getElementById('chat-grupo-mensagens');
-    if (!container) return;
-
-    // Carregar mensagens
-    try {
-        const { data, error } = await supabaseClient
-            .from('mensagens_grupo')
-            .select('*')
-            .eq('grupo_id', grupoId)
-            .order('created_at', { ascending: true })
-            .limit(50);
-        if (error) throw error;
-        container.innerHTML = '';
-        data.forEach(msg => {
-            const div = document.createElement('div');
-            div.className = 'msg-grupo';
-            div.innerHTML = `<strong>${msg.usuario_email || 'Usuário'}</strong>: ${msg.texto} <span class="time">${new Date(msg.created_at).toLocaleTimeString()}</span>`;
-            container.appendChild(div);
-        });
-        container.scrollTop = container.scrollHeight;
-    } catch (e) {
-        console.error('Erro ao carregar mensagens do grupo:', e);
-    }
-
-    // Realtime
-    if (chatGrupoSubscription) {
-        chatGrupoSubscription.unsubscribe();
-        chatGrupoSubscription = null;
-    }
-
-    chatGrupoSubscription = supabaseClient
-        .channel('mensagens_grupo')
-        .on('postgres_changes', {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'mensagens_grupo',
-            filter: `grupo_id=eq.${grupoId}`
-        }, (payload) => {
-            const msg = payload.new;
-            const div = document.createElement('div');
-            div.className = 'msg-grupo';
-            div.innerHTML = `<strong>${msg.usuario_email || 'Usuário'}</strong>: ${msg.texto} <span class="time">${new Date(msg.created_at).toLocaleTimeString()}</span>`;
-            container.appendChild(div);
-            container.scrollTop = container.scrollHeight;
-        })
-        .subscribe();
-
-    // Enviar mensagem
-    const btnEnviar = document.getElementById('btn-chat-grupo-enviar');
-    const input = document.getElementById('chat-grupo-input');
-    
-    const novoBtn = btnEnviar.cloneNode(true);
-    btnEnviar.parentNode.replaceChild(novoBtn, btnEnviar);
-    const novoInput = input.cloneNode(true);
-    input.parentNode.replaceChild(novoInput, input);
-
-    novoBtn.onclick = async () => {
-        const texto = novoInput.value.trim();
-        if (!texto || !grupoAtual || !usuarioAtual) return;
-        try {
-            const { error } = await supabaseClient.from('mensagens_grupo').insert({
-                grupo_id: grupoAtual.id,
-                usuario_id: usuarioAtual.id,
-                usuario_email: usuarioNomeExibicao || usuarioAtual.email.split('@')[0],
-                texto: texto,
-                created_at: new Date().toISOString()
-            });
-            if (error) throw error;
-            novoInput.value = '';
-        } catch (e) {
-            console.error('Erro ao enviar mensagem:', e);
-            alert('Erro ao enviar mensagem.');
-        }
-    };
-    novoInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') novoBtn.click();
-    });
-}
-
-async function carregarRankingGrupo(grupoId, periodo) {
-    if (!grupoId) return;
-    try {
-        const dataInicio = new Date();
-        if (periodo === 'semanal') {
-            dataInicio.setDate(dataInicio.getDate() - 7);
-        } else {
-            dataInicio.setMonth(dataInicio.getMonth() - 1);
-        }
-        const inicioStr = dataInicio.toISOString();
-
-        // Buscar sessões do grupo
-        const { data: sessoes, error } = await supabaseClient
-            .from('sessoes')
-            .select('usuario_id, duracao')
-            .eq('grupo_id', grupoId)
-            .gte('created_at', inicioStr);
-        if (error) throw error;
-
-        // Agrupar minutos
-        const rankingMap = {};
-        sessoes.forEach(s => {
-            const uid = s.usuario_id;
-            if (!rankingMap[uid]) rankingMap[uid] = 0;
-            rankingMap[uid] += s.duracao || 0;
-        });
-
-        const userIds = Object.keys(rankingMap);
-        const div = document.getElementById('ranking-grupo-lista');
-        if (userIds.length === 0) {
-            div.innerHTML = '<p style="color:#94A3B8;">Nenhum estudo registrado neste período.</p>';
-            return;
-        }
-
-        // Buscar nomes
         const { data: usuarios, error: err2 } = await supabaseClient
             .from('usuarios')
             .select('id, nome_exibicao')
@@ -1211,7 +1077,6 @@ async function carregarChatGrupo(grupoId) {
     const container = document.getElementById('chat-grupo-mensagens');
     if (!container) return;
 
-    // Carregar mensagens
     try {
         const { data, error } = await supabaseClient
             .from('mensagens_grupo')
@@ -1232,7 +1097,6 @@ async function carregarChatGrupo(grupoId) {
         console.error('Erro ao carregar mensagens do grupo:', e);
     }
 
-    // Realtime
     if (chatGrupoSubscription) {
         chatGrupoSubscription.unsubscribe();
         chatGrupoSubscription = null;
@@ -1255,7 +1119,6 @@ async function carregarChatGrupo(grupoId) {
         })
         .subscribe();
 
-    // Enviar mensagem
     const btnEnviar = document.getElementById('btn-chat-grupo-enviar');
     const input = document.getElementById('chat-grupo-input');
     
@@ -1460,4 +1323,3 @@ document.querySelectorAll('.drawer-item').forEach(item => {
 // ================================================================
 console.log('🚀 StudyAI v2.0 carregado!');
 console.log('✅ Conversas | Títulos automáticos | Grupos com membros | Chat corrigido');
-console.log(`👑 Admin: ${adminEmail}`);
