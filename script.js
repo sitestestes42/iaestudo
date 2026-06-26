@@ -825,48 +825,56 @@ function finalizarVestibulinho() {
 //  GRUPOS – CORRIGIDO (NOMES DE TABELAS CORRETOS)
 // ================================================================
 
+// ================================================================
+//  CARREGAR GRUPO DO USUÁRIO (COM PERSISTÊNCIA)
+// ================================================================
 async function carregarGrupoDoUsuario() {
     if (!usuarioAtual) return;
     try {
-        // Correção: usar membros_grupo (com "g") e grupos (sem "q")
+        // Tenta buscar do banco
         const { data, error } = await supabaseClient
             .from('membros_grupo')
             .select('grupo_id, grupos(*)')
             .eq('usuario_id', usuarioAtual.id)
             .single();
+
         if (error && error.code !== 'PGRST116') throw error;
+
         if (data) {
             grupoAtual = data.grupos;
+            // Salva no localStorage para persistir
+            localStorage.setItem('grupoAtual', JSON.stringify(grupoAtual));
             mostrarGrupoAtual(grupoAtual);
+        } else {
+            // Se não encontrou no banco, tenta recuperar do localStorage
+            const salvo = localStorage.getItem('grupoAtual');
+            if (salvo) {
+                const grupoSalvo = JSON.parse(salvo);
+                // Verifica se o usuário ainda é membro (opcional, mas evita inconsistências)
+                const { data: membro } = await supabaseClient
+                    .from('membros_grupo')
+                    .select('*')
+                    .eq('grupo_id', grupoSalvo.id)
+                    .eq('usuario_id', usuarioAtual.id)
+                    .single();
+                if (membro) {
+                    grupoAtual = grupoSalvo;
+                    mostrarGrupoAtual(grupoAtual);
+                } else {
+                    localStorage.removeItem('grupoAtual');
+                }
+            }
         }
     } catch (e) {
         console.error('Erro ao carregar grupo:', e);
+        // Fallback: tenta recuperar do localStorage
+        const salvo = localStorage.getItem('grupoAtual');
+        if (salvo) {
+            grupoAtual = JSON.parse(salvo);
+            mostrarGrupoAtual(grupoAtual);
+        }
     }
 }
-
-function mostrarGrupoAtual(grupo) {
-    const div = document.getElementById('meu-grupo-info');
-    if (!div) return;
-    div.style.display = 'block';
-    document.getElementById('grupo-nome-exibido').textContent = `📌 ${grupo.nome}`;
-    document.getElementById('grupo-desc-exibido').textContent = grupo.descricao || 'Sem descrição';
-    document.getElementById('grupo-codigo-exibido').textContent = grupo.codigo_convite;
-
-    // Criar container para membros se não existir
-    let containerMembros = document.getElementById('membros-grupo-lista');
-    if (!containerMembros) {
-        const newContainer = document.createElement('div');
-        newContainer.id = 'membros-grupo-lista';
-        newContainer.style.marginTop = '8px';
-        newContainer.innerHTML = '<p style="color:#94A3B8;">Carregando membros...</p>';
-        div.insertBefore(newContainer, div.querySelector('hr'));
-    }
-
-    carregarMembrosGrupo(grupo.id);
-    carregarRankingGrupo(grupo.id, 'semanal');
-    carregarChatGrupo(grupo.id);
-}
-
 async function carregarMembrosGrupo(grupoId) {
     try {
         // Buscar apenas os IDs dos membros (tabela correta: membros_grupo)
