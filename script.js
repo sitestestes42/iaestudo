@@ -175,6 +175,11 @@ async function entrarNoApp(user) {
             usuarioNomeExibicao = data.nome_exibicao;
         } else {
             usuarioNomeExibicao = user.email.split('@')[0];
+            // Inserir nome se não existir
+            await supabaseClient.from('usuarios').upsert({
+                id: user.id,
+                nome_exibicao: usuarioNomeExibicao
+            });
         }
     } catch (e) {
         usuarioNomeExibicao = user.email.split('@')[0];
@@ -188,7 +193,6 @@ async function entrarNoApp(user) {
         document.getElementById('admin-aulas').style.display = 'block';
     }
 
-    // Adicionar botão para editar nome
     adicionarBotaoEditarNome();
 
     carregarDadosUsuario();
@@ -208,7 +212,7 @@ function adicionarBotaoEditarNome() {
 }
 
 // ================================================================
-//  PERSONALIZAR NOME DE USUÁRIO
+//  PERSONALIZAR NOME
 // ================================================================
 function criarModalNome() {
     const overlay = document.createElement('div');
@@ -262,7 +266,7 @@ window.salvarNomeUsuario = async function() {
 };
 
 // ================================================================
-//  SISTEMA DE CONVERSAS (CORRIGIDO – SEM DUPLICAÇÃO)
+//  SISTEMA DE CONVERSAS
 // ================================================================
 async function carregarConversas() {
     if (!usuarioAtual) return;
@@ -274,9 +278,7 @@ async function carregarConversas() {
             .order('updated_at', { ascending: false });
         if (error) throw error;
         conversas = data || [];
-
         if (conversas.length === 0) {
-            // Criar apenas UMA conversa inicial
             await criarNovaConversa('Nova conversa');
         } else {
             conversaAtual = conversas[0];
@@ -311,15 +313,13 @@ async function criarNovaConversa(titulo = 'Nova conversa') {
     }
 }
 
-// GERAR TÍTULO AUTOMÁTICO (via IA ou fallback)
 async function gerarTituloConversa(primeiraMensagem) {
     if (!primeiraMensagem || primeiraMensagem.length < 5) return 'Nova conversa';
     try {
-        const prompt = `Gere um título curto (máx 5 palavras) para uma conversa que começa com: "${primeiraMensagem}". Retorne apenas o título, sem aspas ou pontuação extra.`;
+        const prompt = `Gere um título curto (máx 5 palavras) para uma conversa que começa com: "${primeiraMensagem}". Retorne apenas o título, sem aspas.`;
         const titulo = await chamarGroq(prompt);
         return titulo.trim().substring(0, 50);
     } catch (e) {
-        // Fallback: usar as primeiras palavras da mensagem
         const palavras = primeiraMensagem.split(' ').slice(0, 4).join(' ');
         return palavras.length > 5 ? palavras : 'Nova conversa';
     }
@@ -352,7 +352,7 @@ async function deletarConversa(id) {
             if (conversaAtual) {
                 carregarMensagensConversa(conversaAtual.id);
             } else {
-                await criarNovaConversa('Nova conversa');
+                await criarNovaConversa();
             }
         }
         renderizarListaConversas();
@@ -450,7 +450,7 @@ window.enviarPergunta = async function(pergunta) {
     chatInput.value = '';
     await salvarMensagem(conversaAtual.id, pergunta, 'usuario');
 
-    // Gerar título automático (se for a primeira mensagem da conversa)
+    // Gerar título automático
     const { count } = await supabaseClient
         .from('mensagens')
         .select('*', { count: 'exact', head: true })
@@ -819,7 +819,7 @@ function finalizarVestibulinho() {
 }
 
 // ================================================================
-//  GRUPOS – COMPLETO (MEMBROS + CHAT CORRIGIDO)
+//  GRUPOS – CORRIGIDO (SEM JOINS PROBLEMÁTICOS)
 // ================================================================
 async function carregarGrupoDoUsuario() {
     if (!usuarioAtual) return;
@@ -847,6 +847,16 @@ function mostrarGrupoAtual(grupo) {
     document.getElementById('grupo-desc-exibido').textContent = grupo.descricao || 'Sem descrição';
     document.getElementById('grupo-codigo-exibido').textContent = grupo.codigo_convite;
 
+    // Criar container para membros se não existir
+    let containerMembros = document.getElementById('membros-grupo-lista');
+    if (!containerMembros) {
+        const newContainer = document.createElement('div');
+        newContainer.id = 'membros-grupo-lista';
+        newContainer.style.marginTop = '8px';
+        newContainer.innerHTML = '<p style="color:#94A3B8;">Carregando membros...</p>';
+        div.insertBefore(newContainer, div.querySelector('hr'));
+    }
+
     carregarMembrosGrupo(grupo.id);
     carregarRankingGrupo(grupo.id, 'semanal');
     carregarChatGrupo(grupo.id);
@@ -854,26 +864,43 @@ function mostrarGrupoAtual(grupo) {
 
 async function carregarMembrosGrupo(grupoId) {
     try {
-        const { data, error } = await supabaseClient
+        // Buscar apenas os IDs dos membros
+        const { data: membros, error } = await supabaseClient
             .from('membros_grupo')
-            .select('usuario_id, usuarios(nome_exibicao)')
+            .select('usuario_id')
             .eq('grupo_id', grupoId);
         if (error) throw error;
+
         const container = document.getElementById('membros-grupo-lista');
-        if (!container) return;
-        if (!data || data.length === 0) {
+        if (!membros || membros.length === 0) {
             container.innerHTML = '<p style="color:#94A3B8;">Nenhum membro.</p>';
             return;
         }
+
+        // Buscar nomes na tabela usuarios
+        const userIds = membros.map(m => m.usuario_id);
+        const { data: usuarios, error: err2 } = await supabaseClient
+            .from('usuarios')
+            .select('id, nome_exibicao')
+            .in('id', userIds);
+        if (err2) throw err2;
+
+        const nomeMap = {};
+        usuarios.forEach(u => {
+            nomeMap[u.id] = u.nome_exibicao || 'Usuário';
+        });
+
         let html = '<div style="display:flex; flex-wrap:wrap; gap:8px;">';
-        data.forEach(m => {
-            const nome = m.usuarios?.nome_exibicao || 'Usuário';
+        membros.forEach(m => {
+            const nome = nomeMap[m.usuario_id] || 'Usuário';
             html += `<span style="background:#1A1F2E; padding:4px 12px; border-radius:20px; border:1px solid #2D3448; font-size:13px;">👤 ${nome}</span>`;
         });
         html += '</div>';
         container.innerHTML = html;
     } catch (e) {
         console.error('Erro ao carregar membros:', e);
+        const container = document.getElementById('membros-grupo-lista');
+        if (container) container.innerHTML = '<p style="color:#F87171;">Erro ao carregar membros.</p>';
     }
 }
 
@@ -954,54 +981,76 @@ document.getElementById('btn-ranking-mensal').addEventListener('click', () => {
 async function carregarRankingGrupo(grupoId, periodo) {
     if (!grupoId) return;
     try {
-        const hojeStr = new Date().toISOString();
-        let dataInicio;
+        const dataInicio = new Date();
         if (periodo === 'semanal') {
-            const d = new Date();
-            d.setDate(d.getDate() - 7);
-            dataInicio = d.toISOString();
+            dataInicio.setDate(dataInicio.getDate() - 7);
         } else {
-            const d = new Date();
-            d.setMonth(d.getMonth() - 1);
-            dataInicio = d.toISOString();
+            dataInicio.setMonth(dataInicio.getMonth() - 1);
         }
-        const { data, error } = await supabaseClient
+        const inicioStr = dataInicio.toISOString();
+
+        // Buscar sessões do grupo
+        const { data: sessoes, error } = await supabaseClient
             .from('sessoes')
-            .select('usuario_id, duracao, usuarios(nome_exibicao)')
+            .select('usuario_id, duracao')
             .eq('grupo_id', grupoId)
-            .gte('created_at', dataInicio);
+            .gte('created_at', inicioStr);
         if (error) throw error;
-        const ranking = {};
-        data.forEach(item => {
-            const nome = item.usuarios?.nome_exibicao || 'Usuário';
-            if (!ranking[nome]) ranking[nome] = 0;
-            ranking[nome] += item.duracao || 0;
+
+        // Agrupar minutos
+        const rankingMap = {};
+        sessoes.forEach(s => {
+            const uid = s.usuario_id;
+            if (!rankingMap[uid]) rankingMap[uid] = 0;
+            rankingMap[uid] += s.duracao || 0;
         });
-        const lista = Object.entries(ranking).sort((a, b) => b[1] - a[1]);
+
+        const userIds = Object.keys(rankingMap);
         const div = document.getElementById('ranking-grupo-lista');
-        if (lista.length === 0) {
+        if (userIds.length === 0) {
             div.innerHTML = '<p style="color:#94A3B8;">Nenhum estudo registrado neste período.</p>';
             return;
         }
+
+        // Buscar nomes
+        const { data: usuarios, error: err2 } = await supabaseClient
+            .from('usuarios')
+            .select('id, nome_exibicao')
+            .in('id', userIds);
+        if (err2) throw err2;
+
+        const nomeMap = {};
+        usuarios.forEach(u => {
+            nomeMap[u.id] = u.nome_exibicao || 'Usuário';
+        });
+
+        const ranking = userIds.map(uid => ({
+            nome: nomeMap[uid] || 'Usuário',
+            total: rankingMap[uid]
+        }));
+        ranking.sort((a, b) => b.total - a.total);
+
         let html = '';
-        lista.forEach(([nome, total], i) => {
+        ranking.forEach((item, i) => {
             const medalha = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}º`;
-            html += `<div class="ranking-item"><span class="pos">${medalha}</span><span class="nome">${nome}</span><span class="min">${total} min</span></div>`;
+            html += `<div class="ranking-item"><span class="pos">${medalha}</span><span class="nome">${item.nome}</span><span class="min">${item.total} min</span></div>`;
         });
         div.innerHTML = html;
     } catch (e) {
         console.error('Erro ao carregar ranking:', e);
+        const div = document.getElementById('ranking-grupo-lista');
+        if (div) div.innerHTML = '<p style="color:#F87171;">Erro ao carregar ranking.</p>';
     }
 }
 
 // ================================================================
-//  CHAT DO GRUPO – CORRIGIDO COM REALTIME
+//  CHAT DO GRUPO – CORRIGIDO
 // ================================================================
 async function carregarChatGrupo(grupoId) {
     const container = document.getElementById('chat-grupo-mensagens');
     if (!container) return;
 
-    // Carregar mensagens recentes
+    // Carregar mensagens
     try {
         const { data, error } = await supabaseClient
             .from('mensagens_grupo')
@@ -1022,10 +1071,12 @@ async function carregarChatGrupo(grupoId) {
         console.error('Erro ao carregar mensagens do grupo:', e);
     }
 
-    // Inscrever para novas mensagens (Realtime)
+    // Realtime
     if (chatGrupoSubscription) {
         chatGrupoSubscription.unsubscribe();
+        chatGrupoSubscription = null;
     }
+
     chatGrupoSubscription = supabaseClient
         .channel('mensagens_grupo')
         .on('postgres_changes', {
@@ -1046,25 +1097,32 @@ async function carregarChatGrupo(grupoId) {
     // Enviar mensagem
     const btnEnviar = document.getElementById('btn-chat-grupo-enviar');
     const input = document.getElementById('chat-grupo-input');
-    btnEnviar.onclick = async () => {
-        const texto = input.value.trim();
+    
+    const novoBtn = btnEnviar.cloneNode(true);
+    btnEnviar.parentNode.replaceChild(novoBtn, btnEnviar);
+    const novoInput = input.cloneNode(true);
+    input.parentNode.replaceChild(novoInput, input);
+
+    novoBtn.onclick = async () => {
+        const texto = novoInput.value.trim();
         if (!texto || !grupoAtual || !usuarioAtual) return;
         try {
-            await supabaseClient.from('mensagens_grupo').insert({
+            const { error } = await supabaseClient.from('mensagens_grupo').insert({
                 grupo_id: grupoAtual.id,
                 usuario_id: usuarioAtual.id,
                 usuario_email: usuarioNomeExibicao || usuarioAtual.email.split('@')[0],
                 texto: texto,
                 created_at: new Date().toISOString()
             });
-            input.value = '';
+            if (error) throw error;
+            novoInput.value = '';
         } catch (e) {
             console.error('Erro ao enviar mensagem:', e);
             alert('Erro ao enviar mensagem.');
         }
     };
-    input.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') btnEnviar.click();
+    novoInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') novoBtn.click();
     });
 }
 
