@@ -1309,7 +1309,6 @@ document.getElementById('btn-sair-grupo').addEventListener('click', async () => 
     }
 });
 
-let rankingPeriodo = 'semanal';
 
 document.getElementById('btn-ranking-semanal').addEventListener('click', () => {
     rankingPeriodo = 'semanal';
